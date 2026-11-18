@@ -82,6 +82,12 @@ installs everything on Windows, from scratch.
   Sun, each in its real position. Checked against the flown path of Artemis I, from JPL Horizons:
   within 3 m after 4 hours of free flight, and 40 m after 20 hours. Nothing on screen uses it
   yet: it is what the mission simulation is computed with (cards C15 and C16).
+- The reference mission of the engine (`src/engine/mission.js`, card C15): for a launch site, a
+  landing site and one of its landing windows, when to launch and in which direction, the three
+  burns and the path, phase by phase, found by aiming with the propagator. `useMission`
+  (`src/hooks/useMission.js`) delivers it to the screen from a Worker. The numbers of the mission
+  (`MISSION`, in `src/engine/config.js`) are provisional, and nothing on screen draws it yet
+  (card C16).
 - In the panel, the list of landing sites, which also chooses the site, including by keyboard
   alone (card I2): the IM-2 landing and the center of 7 of the 9 Artemis III candidate regions
   (card E16). Also in the panel, the date and time in UTC, which start at the time the page was
@@ -332,6 +338,7 @@ umbraview/
 │   │   ├── horizon.js               the horizon of a point, direction by direction
 │   │   ├── landingAreas.js          which points of a grid have a landing window in the period of a date
 │   │   ├── landingGridFiles.js      the landing grid files, and the map mask for the scene
+│   │   ├── mission.js               the reference mission: from a launch site to a landing site inside a landing window (card C15)
 │   │   ├── orbit.js                 the orbit propagator: a spacecraft under the gravity of the Earth, the Moon and the Sun (card C14)
 │   │   ├── relief.js                the terrain height at a point: polar, cylindrical or tiled grid
 │   │   ├── reliefFiles.js           the site's terrain files become the horizon layers
@@ -346,6 +353,7 @@ umbraview/
 │   │   ├── useFarRelief.js          the pole's coarse terrain, for the scene mesh (card C2)
 │   │   ├── useGlobalTiles.js        the whole-Moon terrain tiles around the camera (exp/lua-inteira-com-relevo)
 │   │   ├── useLandingAreas.js       the map of areas with a landing window on the date, computed in a Worker
+│   │   ├── useMission.js            the reference mission for a launch site, a landing site and a window, computed in a Worker (card C15)
 │   │   ├── useNearTiles.js          the fine terrain tiles around the camera (card C6)
 │   │   ├── useSiteSky.js            the sky of the chosen site, with the calculation status
 │   │   ├── useSkyRotation.js        the rotation of the star sky for the scene, on the date
@@ -414,7 +422,8 @@ umbraview/
 │   │   ├── global.css
 │   │   └── tokens.css
 │   ├── workers/
-│   │   └── landingAreas.worker.js   the landing areas map calculation, off the page's main thread
+│   │   ├── landingAreas.worker.js   the landing areas map calculation, off the page's main thread
+│   │   └── mission.worker.js        the reference mission calculation, off the page's main thread (card C15)
 │   ├── App.css
 │   ├── App.jsx
 │   ├── main.jsx

@@ -127,6 +127,12 @@ A first draft tried to aim by changing the direction of the burn, and did not co
 happens almost on the opposite side of the Earth from the Moon, where a sideways push barely
 moves the arrival point. Aiming with the launch plane, as real missions do, is what made it work.
 
+*Added on 18/11/2026, with card C15 built:* the aiming is now in the repository
+(`src/engine/mission.js`), with its tests. 26 missions of December 2026 closed, with burns and
+tilts in the same ranges as above, in 64 to 85 ms each in Node and 71 to 86 ms in the browser:
+about ten times faster than the draft. The numbers of the mission are still the draft's, and
+provisional. The measurements are in card C15 of the [backlog](backlog.md).
+
 ## Where each piece goes
 
 Following the three rules of the README: text in `src/data/`, color and size from the tokens,

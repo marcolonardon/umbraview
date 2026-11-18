@@ -91,6 +91,35 @@ C3). It does not depend on the chosen point: the light exists before anyone choo
 while `useSiteSky` is calculating. As long as the date does not change, it returns the same
 object.
 
+`useMission(launchSite, landingSite, landingWindow)` (added in card C15) takes the launch site on
+the Earth and the landing site on the Moon (objects with `lat` and `lon` in degrees) and one of the
+windows of `sky.landingWindows`. Any of the three can be `null` while it is not chosen. It returns
+`{ status, mission }`:
+
+| Field | Type | What it is |
+|---|---|---|
+| `status` | `'idle'`, `'loading'`, `'ready'` or `'error'` | `idle`: one of the three is not chosen. `loading`: calculating; `mission` is `null`, even if another mission was on screen. `ready`: `mission` has the result. `error`: no path was found for that window, or the calculation failed; the reason goes to the console. |
+| `mission` | object, or `null` when `status` is not `ready` | The reference mission, in the fields below. |
+| `mission.launchUtc`, `mission.tliUtc`, `mission.loiUtc`, `mission.descentUtc`, `mission.landingUtc` | `Date` | In this order: the launch from the pad; the burn that leaves the parking orbit around the Earth; the pass by the Moon, with the burn that enters the lunar orbit; the burn that leaves the lunar orbit; the landing. |
+| `mission.launchAzimuthDeg` | number | The direction of the launch at the pad, in degrees from north through east: 90 is due east. It is the direction of the orbit, without the speed the ground already has from the Earth's rotation. |
+| `mission.parkingInclinationDeg` | number | The tilt of the parking orbit to the Earth's equator, in degrees. |
+| `mission.lunarInclinationDeg` | number | The tilt of the lunar orbit to the Moon's equator, in degrees. Always below 90: the orbit goes around in the same sense as the Moon turns. |
+| `mission.tliDeltaVKmS`, `mission.loiDeltaVKmS`, `mission.descentDeltaVKmS` | number | The speed change of each burn, in km/s, always positive: the first speeds the spacecraft up, the other two slow it down. |
+| `mission.crossingHours` | number | From `tliUtc` to `loiUtc`, in hours. |
+| `mission.lunarOrbitHours` | number | From `loiUtc` to `descentUtc`, in hours. |
+| `mission.elapsedMs` | number | How long the calculation took, in milliseconds. |
+| `mission.segments` | list of 6 objects | The path, one stretch per phase, in the order of the flight: `ascent`, `parking`, `crossing`, `lunarOrbit`, `descent` and `landing`. Each stretch starts where the one before ends. |
+| `segments[i].phase` | one of the six names above | Which phase the stretch is. |
+| `segments[i].kind` | `'integrated'` or `'schematic'` | `integrated`: computed step by step under gravity. `schematic`: a curve drawn between two computed points (the `ascent` and the `landing`); the screen shows it with a different line. |
+| `segments[i].center` | `'earth'` or `'moon'` | Where the points are counted from. The ones from the Moon (`lunarOrbit`, `descent` and `landing`) move with it: the screen adds the Moon's position at the clock's instant (`systemStateAt(...).moonKm`). |
+| `segments[i].timesMs` | `Float64Array` | One instant per point, in milliseconds UTC, always increasing. |
+| `segments[i].positionsKm` | `Float32Array` | Three numbers per point, in km, in the drawing frame of `src/engine/system.js`: the same as `earthSiteKm` and `systemStateAt`, so the line falls on the Earth and the Moon the mission view draws. |
+
+The engine delivers `mission` ready, in this format: `computeMission`, in `src/engine/mission.js`.
+A mission has 7 to 8 thousand points. The numbers that define the mission (the heights of the two
+orbits, the crossing time, how long the spacecraft stays in the lunar orbit and the others) are in
+`MISSION`, in `src/engine/config.js`, and are provisional.
+
 ---
 
 ## E: Enzo
@@ -1804,8 +1833,7 @@ and `verify` passes.
 ### C14 · The propagator, checked against a flown trajectory
 
 **Status:** built on 18/11, on the branch `feat/c14-propagador` of Marco's fork
-(`marcolonardon/umbraview`), not committed yet; it waits for Enzo's OK and for the PR number ·
-**Depends on:** nothing
+(`marcolonardon/umbraview`); it waits for Enzo's OK and for the PR number · **Depends on:** nothing
 
 **What it is for.** To draw an orbit that is real, the engine has to move a spacecraft under
 gravity. This card is only that: given a position, a speed and an instant, where the spacecraft
@@ -1905,8 +1933,10 @@ written in this card, no file in `src/engine/` imports React, and `verify` passe
 
 ### C15 · The mission in the engine: from the launch site to the landing window
 
-**Status:** proposed on 17/11; waits for Enzo's OK · **Depends on:** C13 (the launch sites) and
-C14 (the propagator)
+**Status:** built on 18/11, on the branch `feat/c15-missao` of Marco's fork
+(`marcolonardon/umbraview`), born from the branch of card C14; it waits for Enzo's OK, for the PR
+number and for the decision about the mission's numbers, which are provisional · **Depends on:**
+C13 (the launch sites) and C14 (the propagator)
 
 **What it is for.** Given a launch site, a landing site and one of its landing windows, compute
 the mission: when to launch and in which direction, the burns, and the path, phase by phase.
@@ -1950,6 +1980,112 @@ laptop as well, and written in this card; the simulated launch for the IM-2 land
 is compared with the real one (26/02/2025, 7:16 p.m. EST, NASA) and the difference is written
 here, as a note and not as a pass or fail, because IM-2 flew its own profile; the bridge table has
 the new format; and `verify` passes.
+
+**How it turned out.**
+- **Two functions** in `src/engine/mission.js`. `designMission` gives the mission in the engine's
+  frame, with the state of the spacecraft at each event: it is what the tests check. `computeMission`
+  gives what the screen uses, in the format of "What the bridge delivers to the screen".
+- **Every number of the mission is provisional** (`MISSION`, in `src/engine/config.js`). Four are
+  the draft's: parking orbit at 185 km, crossing of 4 days, lunar orbit at 100 km, and the landing
+  aimed 12 hours after the window opens. Six were put on 18/11 for the calculation to close: 12
+  hours in the lunar orbit; a climb of 10 minutes over 20° around the Earth; and a descent that ends
+  15 km above the ground, 15° before the site, with 12 minutes from there to the ground. None has a
+  source. Choosing each one, with its source or its reason, is still Marco's and Enzo's decision,
+  and `config.test.js` holds the numbers until then.
+- **The launch time.** The plane of the crossing contains the launch site, at the launch instant,
+  and the direction of the Moon at the arrival. Twice a day that plane is as little tilted as it
+  can be. Of those times, the engine takes the one that leaves the crossing closest to the 4 days
+  asked, so the crossing of each mission is 3.6 to 4.3 days, and not exactly 4.
+- **The tilt is measured from the Earth's pole on the date**, and not from the pole of J2000, the
+  frame of the ephemeris. The two are 0.15° apart in 2026, and a test caught it: with the pole of
+  J2000, the parking orbit of Kennedy came out less tilted than the site's latitude, which no orbit
+  through the site can be.
+- **The aiming** is the plan's: three choices (the speed at the end of the burn, how long the
+  spacecraft waits in the parking orbit before it, and the tilt of the plane around the launch
+  site), three targets, Newton's method, and the gravity of the Moon and the Sun switched on in
+  five steps (`AIMING`, in `config.js`). The spacecraft passes on the side of the Moon that leaves
+  the lunar orbit going around in the same sense as the Moon turns. The other side, which the
+  draft also tried, is not offered.
+- **The arrival time is part of the aiming, and not the landing minus 12 hours.** The spacecraft
+  can only leave the lunar orbit at one point of each lap (1 h 58 min). The third target is the
+  arrival time that puts that point at the right instant for the landing to fall at the aimed
+  time, with the whole laps that fit in the 12 hours. The stay comes out between 12.3 and 12.5
+  hours.
+- **The descent.** A burn of 19.5 m/s against the motion, half a lap before the low point; the
+  spacecraft reaches 15 km above the ground 15° before the site, and the last stretch to the ground
+  is drawn. The lunar orbit and the descent are integrated with the Earth and the Sun pulling,
+  and the instant to leave the orbit comes from the formula of a perfect circle: in 26 missions the
+  spacecraft reached the low point between 14.96 and 14.99 km, 14.95° to 14.98° before the site
+  and at most 0.012° out of its plane. That difference, up to 1.6 km, is what the drawn curve
+  closes.
+- **Two cautions the aiming needed.** Right after leaving the Earth, on the far side from the
+  Moon, the spacecraft can come closer to the Moon and move away once, only because it is going
+  around the Earth: that pass does not count, only one with the spacecraft closer to the Moon than
+  to the Earth. And if the first guess puts the burn less than 5 minutes after the spacecraft
+  enters the parking orbit, it waits one more lap, so the aiming has room to move the burn earlier.
+- **Measured** on 18/11/2026, in 26 missions to the IM-2 landing site with landing windows of
+  December 2026 (Kennedy on 10 dates; Kourou, Baikonur, Mahia and Alcântara on 4 dates each). All
+  closed at the first launch time tried, in 2 or 3 corrections for each of the five gravity steps.
+
+  | What | Measured |
+  |---|---|
+  | Burn to leave the Earth | 3.128 to 3.149 km/s |
+  | Burn to enter lunar orbit | 0.815 to 0.874 km/s |
+  | Crossing | 3.64 to 4.27 days |
+  | Tilt of the parking orbit | Kennedy 28.45° to 28.62° (its latitude seen from the center of the Earth is 28.45°); Baikonur 45.87° to 45.92°; Mahia 39.07° to 39.14°; Kourou 5.2° to 28.2°; Alcântara 2.3° to 28.3° |
+  | Tilt of the lunar orbit | 84.8° to 85.5° |
+  | Parking orbit, during the wait | within 2 m of 185 km |
+  | Lunar orbit, during the stay | within 50 m of 100 km |
+  | Points in the path | 7,400 to 8,200 |
+
+  The burns are in the range the draft found. They were not verified against a source.
+- **How long one mission takes.** In Node 25, on Marco's computer: 64 to 85 ms (the draft took 458
+  to 877 ms). In the browser, on the same computer (the Chromium of the Claude app, with
+  `npm run dev`): 71 to 81 ms on the main thread, and 79 to 86 ms inside the Worker; the first
+  request took 219 ms from the page's side, with the Worker starting. Not measured on Miguel's
+  laptop.
+- **The Worker stayed**, as the card asked, even with the calculation ten times faster than the
+  draft: 80 ms on this computer is a visible hitch at every change of launch site, and it was not
+  measured on a slower one.
+- **The note about IM-2.** Aimed at the time IM-2 landed (06/03/2025, about 17:30 UTC), from pad
+  39A, the reference mission launches on 02/03/2025 at 00:34 UTC. IM-2 launched on 27/02/2025 at
+  00:16 UTC (GCAT; it is the card's 26/02 at 7:16 p.m. EST): 3.0 days earlier. It is the expected
+  difference between two profiles: the reference mission crosses in 4.1 days and stays 12 hours in
+  lunar orbit, and IM-2 took 7 days and 17 hours from the launch to the landing. For that mission:
+  tilt 28.57°, 3.133 km/s to leave the Earth and 0.821 km/s to enter lunar orbit.
+- **The bridge.** `useMission` (`src/hooks/useMission.js`) and the Worker
+  (`src/workers/mission.worker.js`). The format is in "What the bridge delivers to the screen".
+  **Miguel has not been told yet:** the card asks for it on the same day, and it is Marco's to do.
+- **Nothing on screen uses it yet** (card C16). Because of that, the production build does not
+  carry the Worker: no component imports the hook.
+- **Left out, on purpose:** the other side of the Moon; choosing the day of the launch; the height
+  of the ground at the landing site (the landing ends on the Moon's reference sphere, at
+  1,737.4 km); a path that crosses the ground; and the real climb of a rocket.
+
+**Verified** on 18/11/2026:
+- `mission.test.js` has 55 tests, `useMission.test.js` has 8, and `config.test.js` has 3 more for
+  `MISSION` and `AIMING`.
+- Test first, for the engine: against a skeleton that returned the spacecraft standing still, 52
+  of the 55 tests failed. Of the 3 that passed, one passed by coincidence of the skeleton's
+  numbers, one ran over an empty list and now asks for the six stretches, and one expects nothing.
+  The tests of the hook were written before the hook, but were not run against an empty one.
+- Each fault planted fails its own tests. In `mission.js`: passing on the other side of the Moon
+  (1 test); the low point after the site, and not before (1); the pole of J2000 in place of the
+  date's (the tilt tests of Kennedy and Baikonur); one axis of the path not turned to the drawing
+  (3); the arrival burn 1% too strong (the arrival, the lunar orbit and the descent); the highest
+  tilt of the day in place of the lowest (6); the landing aimed at the end of the window (3); the
+  lunar orbit counted from the Earth (1). In `useMission.js`: showing the previous mission while
+  calculating, accepting the answer of an old request, making the request from the objects and
+  not from their numbers, and not ending the Worker (1 test each).
+- The real Worker, in the browser with `npm run dev`: it gives the same launch instant and the
+  same burn as Node, the points arrive as `Float32Array` and `Float64Array` and the instants as
+  `Date`, and a window that ends before it starts comes back as `error`.
+- `npm run verify` passes, with 801 tests in 64 files and no lint warning. On the way it caught
+  one thing: the landing window was called `window` in the engine, a word the engine's own guard
+  (`noBrowserDependencies.test.js`) does not accept there. It is `landingWindow` now.
+- Not verified: the time on Miguel's laptop; the Worker in the production build and in a browser
+  other than Chromium; and a window that came from `sky.landingWindows` (the tests use windows
+  typed by hand, in the same format).
 
 ### C16 · The mission on screen: the path, the clock and the numbers
 
