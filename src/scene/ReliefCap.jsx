@@ -19,6 +19,12 @@ import { buildReliefCap, coverTriangles, reliefVertexLabels } from './reliefMesh
 
 const NO_COVER = []
 
+/* A borda do relevo do polo fica na altura real, sem descer até o raio 1: em volta dela vem o
+   relevo da Lua inteira (GlobalRelief.jsx), e descendo, ela abria um degrau de alguns quilômetros
+   em volta de 77°S. De longe, onde a esfera lisa volta no lugar do relevo da Lua inteira, o degrau
+   entre a borda e a esfera fica menor que um pixel. */
+const CAP_MESH = { overlapM: 0, fadeM: 0 }
+
 /* Troca os triângulos desenhados pelos de `indices`, no mesmo buffer da placa de vídeo. O buffer
    tem o tamanho da malha sem buraco, que é o maior possível; o drawRange diz até onde desenhar, e
    o clique e a sombra respeitam ele. Um buffer novo a cada bloco do relevo fino (uns 3 MB) ficaria
@@ -40,7 +46,7 @@ export function ReliefCap({ relief, color, cover = NO_COVER }) {
   )
 
   const { geometry, fullIndices, vertexTiles } = useMemo(() => {
-    const { positions, indices } = buildReliefCap(grid)
+    const { positions, indices } = buildReliefCap(grid, CAP_MESH)
     const built = new BufferGeometry()
     built.setAttribute('position', new BufferAttribute(positions, 3))
     built.setIndex(new BufferAttribute(indices, 1))

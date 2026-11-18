@@ -11,6 +11,7 @@ import { SRGBColorSpace, Texture } from 'three'
 
 import { globalLandingShader, globeTextureWindow, setSouthColor } from './moonGlobe.js'
 import { moonImagesOfPage } from './moonImages.js'
+import { GLOBE_LAYER } from './reliefLayers.js'
 
 /* Triângulos da esfera: com o mapa de normais, a luz não depende deles, mas a borda da Lua contra
    o céu, sim. Com 128 × 64, de perto a borda mostrava as quinas. */
@@ -85,8 +86,11 @@ export function MoonGlobe({ color, thetaLength, far }) {
   }, [south, far, invalidate])
   useEffect(() => () => south?.dispose(), [south])
 
+  /* A esfera vem por último no estêncil (reliefLayers.js): só aparece onde nenhum relevo desenhou.
+     Sem isto, no fundo de uma bacia, onde o chão fica quilômetros abaixo do raio 1, ela cobriria o
+     relevo da Lua inteira. */
   return (
-    <mesh receiveShadow>
+    <mesh receiveShadow renderOrder={GLOBE_LAYER.renderOrder} userData={GLOBE_LAYER.userData}>
       <sphereGeometry args={[1, WIDTH_SEGMENTS, HEIGHT_SEGMENTS, 0, 2 * Math.PI, 0, thetaLength]} />
       {/* O polygonOffset empurra a esfera um pouco para trás na profundidade: na faixa em que ela
           passa por baixo da borda do relevo, as duas ficam no mesmo raio, e sem isto piscariam
@@ -102,6 +106,7 @@ export function MoonGlobe({ color, thetaLength, far }) {
         polygonOffset
         polygonOffsetFactor={1}
         polygonOffsetUnits={1}
+        {...GLOBE_LAYER.material}
       />
     </mesh>
   )

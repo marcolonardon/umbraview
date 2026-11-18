@@ -22,6 +22,8 @@ vi.mock('@react-three/fiber', () => ({
     return <div data-testid="canvas">{children}</div>
   },
   useFrame: () => {},
+  // a luz do Sol pede o quadro novo quando a data muda (SunLight, em LunarScene.jsx)
+  useThree: (selector) => selector({ invalidate: () => {} }),
 }))
 vi.mock('@react-three/drei', () => ({
   OrbitControls: (props) => { controles(props); return null },
@@ -36,6 +38,9 @@ vi.mock('./StarField.jsx', () => ({ StarField: (props) => { ceu(props); return n
 const globo = vi.fn()
 const enquadramento = vi.fn()
 vi.mock('./MoonGlobe.jsx', () => ({ MoonGlobe: (props) => { globo(props); return null } }))
+// o relevo da Lua inteira também: os pedaços e as malhas têm teste próprio (globalTiles.test.js)
+const relevoGlobal = vi.fn()
+vi.mock('./GlobalRelief.jsx', () => ({ GlobalRelief: (props) => { relevoGlobal(props); return null } }))
 // a câmera desta versão é uma peça só (o CameraControls do Drei, em CameraRig.jsx): é ela que
 // recebe os limites do zoom, o giro sozinho e o ponto escolhido
 vi.mock('./CameraRig.jsx', () => ({ CameraRig: (props) => { enquadramento(props); controles(props); return null } }))
@@ -180,6 +185,14 @@ describe('LunarScene', () => {
     sistemaPede(false)
     render(<LunarScene dateUtc={DATA} />)
     expect(screen.getByTestId('canvas')).toBeInTheDocument()
+  })
+
+  it('o relevo da Lua inteira entra na cena; sem o relevo do polo, nenhuma latitude fica de fora', () => {
+    sistemaPede(false)
+    relevoGlobal.mockClear()
+    render(<LunarScene dateUtc={DATA} />)
+    expect(relevoGlobal).toHaveBeenCalled()
+    expect(relevoGlobal.mock.calls.at(-1)[0]).toMatchObject({ skipSouthOfDeg: -90 })
   })
 
   it('com o pedido de menos movimento, não gira sozinha nem desliza depois de soltar o mouse', () => {

@@ -336,6 +336,7 @@ umbraview/
 │   ├── hooks/                       the bridge between the engine and the screen (card E3)
 │   │   ├── usePrefersReducedMotion.js  whether the person asked the system for less animation
 │   │   ├── useFarRelief.js          the pole's coarse terrain, for the scene mesh (card C2)
+│   │   ├── useGlobalTiles.js        the whole-Moon terrain tiles around the camera (exp/lua-inteira-com-relevo)
 │   │   ├── useLandingAreas.js       the map of areas with a landing window on the date, computed in a Worker
 │   │   ├── useNearTiles.js          the fine terrain tiles around the camera (card C6)
 │   │   ├── useSiteSky.js            the sky of the chosen site, with the calculation status
@@ -363,6 +364,7 @@ umbraview/
 │   │   └── skyChart.js              the drawing math for the ground view and the timeline
 │   ├── scene/                       the 3D Moon (cards C1 to C3, C6 and C8)
 │   │   ├── CameraRig.jsx            the camera: frames the whole Moon, zooms with the wheel or a pinch, flies to the site and back
+│   │   ├── GlobalRelief.jsx         the close-up whole-Moon terrain, with shadows, outside the pole (exp/lua-inteira-com-relevo)
 │   │   ├── LandingAreasLayer.jsx    the map of areas with a landing window, painted over the Moon
 │   │   ├── LunarScene.css
 │   │   ├── LunarScene.jsx           the Moon, the Sun's light for the date and the camera that rotates with the mouse
@@ -391,14 +393,15 @@ umbraview/
 │   │   ├── additiveLight.js         the blending of lights that add onto the background: the stars and the Sun's glow
 │   │   ├── earthImage.js            the Earth image for the system view, read once per page
 │   │   ├── framing.js               the camera distance for the Moon to fit in the scene, and the angles of the flight to the site
+│   │   ├── globalTiles.js           which pieces of the whole-Moon terrain the scene draws, with how much detail, and their mesh
 │   │   ├── moonGlobe.js             where each point of the Moon falls on the images, and the pole color on the terrain meshes
 │   │   ├── moonImages.js            the Moon images, read once per page
 │   │   ├── nearTiles.js             which fine terrain tiles the scene draws, and their mesh (card C6)
 │   │   ├── picking.js               the click on the Moon and where the marker goes (card C3)
-│   │   ├── reliefLayers.js          which one shows on top between the fine and the coarse terrain: the stencil (card C6)
+│   │   ├── reliefLayers.js          which terrain mesh shows on top of which: the stencil (card C6)
 │   │   ├── reliefMesh.js            the terrain mesh, at real height, from far.bin
 │   │   ├── starPoints.js            the size and brightness of each star on screen, by magnitude
-│   │   └── sunLight.js              where the Sun's light is, and why its target is the pole
+│   │   └── sunLight.js              where the Sun's light is, and the shadow box that follows the camera
 │   ├── styles/
 │   │   ├── global.css
 │   │   └── tokens.css

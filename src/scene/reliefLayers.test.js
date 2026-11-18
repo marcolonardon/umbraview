@@ -6,16 +6,33 @@ import { describe, expect, it } from 'vitest'
 import {
   AlwaysStencilFunc,
   DataUtils,
+  GreaterEqualStencilFunc,
   HalfFloatType,
   KeepStencilOp,
   LinearFilter,
+  MeshStandardMaterial,
   NotEqualStencilFunc,
   ObjectSpaceNormalMap,
   ReplaceStencilOp,
+  RGBADepthPacking,
   RGBAFormat,
+  ShaderLib,
 } from 'three'
 
-import { CENTER_LAYER, COARSE_LAYER, RING_LAYER, createLayerMaterial, createNormalTexture, visibleHit } from './reliefLayers.js'
+import {
+  CENTER_LAYER,
+  COARSE_LAYER,
+  GLOBAL_LAYER,
+  GLOBE_LAYER,
+  RING_LAYER,
+  createGlobalDepthMaterial,
+  createGlobalMaterial,
+  createLayerMaterial,
+  createNormalTexture,
+  globalFlatten,
+  setGlobalFlatten,
+  visibleHit,
+} from './reliefLayers.js'
 
 /* Desenha num pixel as malhas que caem nele e devolve qual aparece. Cada malha é [nome, camada,
    profundidade], com a profundidade menor mais perto da câmera. */
@@ -27,7 +44,11 @@ function drawPixel(meshes) {
   for (const [name, layer, meshDepth] of ordered) {
     const { stencilWrite, stencilFunc, stencilRef, stencilZPass = KeepStencilOp } = layer.material
     const passesStencil =
-      !stencilWrite || stencilFunc === AlwaysStencilFunc || (stencilFunc === NotEqualStencilFunc && stencil !== stencilRef)
+      !stencilWrite ||
+      stencilFunc === AlwaysStencilFunc ||
+      (stencilFunc === NotEqualStencilFunc && stencil !== stencilRef) ||
+      // GL_GEQUAL: passa se o valor da malha for maior ou igual ao que está no pixel
+      (stencilFunc === GreaterEqualStencilFunc && stencilRef >= stencil)
     if (!passesStencil || meshDepth >= depth) continue
     depth = meshDepth
     shown = name
@@ -53,11 +74,96 @@ describe('reliefLayers', () => {
   it('entre duas malhas da mesma camada, ganha a mais perto: o relevo esconde o próprio relevo', () => {
     expect(drawPixel([['centro longe', CENTER_LAYER, 3], ['centro perto', CENTER_LAYER, 2]])).toBe('centro perto')
     expect(drawPixel([['grosso longe', COARSE_LAYER, 3], ['grosso perto', COARSE_LAYER, 2]])).toBe('grosso perto')
+    // quem grava no estêncil também: a encosta de trás, desenhada antes, não pode tapar a da frente
+    expect(drawPixel([['anel longe', RING_LAYER, 3], ['anel perto', RING_LAYER, 2]])).toBe('anel perto')
+    expect(drawPixel([['global longe', GLOBAL_LAYER, 3], ['global perto', GLOBAL_LAYER, 2]])).toBe('global perto')
   })
 
-  it('a ordem é o centro, o anel e o grosso', () => {
+  it('a ordem é o centro, o anel, o grosso, o relevo da Lua inteira e a esfera lisa', () => {
     expect(CENTER_LAYER.renderOrder).toBeLessThan(RING_LAYER.renderOrder)
     expect(RING_LAYER.renderOrder).toBeLessThan(COARSE_LAYER.renderOrder)
+    expect(COARSE_LAYER.renderOrder).toBeLessThan(GLOBAL_LAYER.renderOrder)
+    expect(GLOBAL_LAYER.renderOrder).toBeLessThan(GLOBE_LAYER.renderOrder)
+  })
+
+  it('o relevo da Lua inteira aparece onde o do polo não desenha, e não por cima dele', () => {
+    // na emenda em volta de 77°S, as duas fontes do LOLA não ficam na mesma altura
+    expect(drawPixel([['global', GLOBAL_LAYER, 1], ['grosso', COARSE_LAYER, 2]])).toBe('grosso')
+    expect(drawPixel([['global', GLOBAL_LAYER, 1], ['centro', CENTER_LAYER, 3]])).toBe('centro')
+    expect(drawPixel([['global', GLOBAL_LAYER, 4]])).toBe('global')
+  })
+
+  it('a esfera lisa só aparece onde nenhum relevo desenhou, mesmo mais perto da câmera', () => {
+    // no fundo de uma bacia, o chão fica quilômetros abaixo do raio 1, e a esfera ficaria por cima
+    expect(drawPixel([['esfera', GLOBE_LAYER, 1], ['global', GLOBAL_LAYER, 2]])).toBe('global')
+    expect(drawPixel([['esfera', GLOBE_LAYER, 1], ['grosso', COARSE_LAYER, 2]])).toBe('grosso')
+    expect(drawPixel([['esfera', GLOBE_LAYER, 1]])).toBe('esfera')
+  })
+})
+
+describe('createGlobalMaterial', () => {
+  it('leva o estêncil da camada, a imagem de cor da esfera e o mapa das áreas de pouso', () => {
+    const map = { isTexture: true }
+    const material = createGlobalMaterial('#808080', map)
+    expect(material.stencilWrite).toBe(true)
+    expect(material.stencilFunc).toBe(GLOBAL_LAYER.material.stencilFunc)
+    expect(material.stencilZPass).toBe(GLOBAL_LAYER.material.stencilZPass)
+    expect(material.map).toBe(map)
+    // com a imagem, a cor do material é branca, para a imagem aparecer com a cor dela
+    expect(material.color.getHexString()).toBe('ffffff')
+    // o mapa das áreas de pouso, o mesmo da esfera (globalLandingShader, em moonGlobe.js)
+    const shader = shaderOf('standard')
+    material.onBeforeCompile(shader)
+    expect(shader.fragmentShader).toContain('globalLandingAt(normalize(vGlobePosition))')
+  })
+
+  it('sem a imagem, fica com a cor lisa, como a esfera enquanto a imagem baixa', () => {
+    const material = createGlobalMaterial('#808080', null)
+    expect(material.map).toBeNull()
+    expect(material.color.getHexString()).toBe('808080')
+  })
+})
+
+/* O começo de um shader do three, como o onBeforeCompile recebe: o do material de verdade, para o
+   teste falhar se uma versão nova do three mudar os pontos em que o achatamento entra. */
+const shaderOf = (name) => ({ uniforms: {}, vertexShader: ShaderLib[name].vertexShader, fragmentShader: ShaderLib[name].fragmentShader })
+
+describe('o achatamento do relevo da Lua inteira até a esfera lisa (flattenAmount, em globalTiles.js)', () => {
+  const MORPH = 'transformed = mix(transformed, normalize(position), uFlatten)'
+  const NORMAL = 'objectNormal = normalize(mix(objectNormal, normalize(position), uFlatten))'
+
+  it('leva o vértice para o raio 1 e a normal para a da esfera, depois das contas do three', () => {
+    const shader = shaderOf('standard')
+    createGlobalMaterial('#808080', null).onBeforeCompile(shader)
+    expect(shader.uniforms.uFlatten).toBe(globalFlatten)
+    expect(shader.vertexShader).toContain('uniform float uFlatten;')
+    // logo depois de o three montar a posição e a normal do vértice: antes, ele escreveria por cima
+    expect(shader.vertexShader).toContain(`#include <begin_vertex>\n${MORPH}`)
+    expect(shader.vertexShader).toContain(`#include <beginnormal_vertex>\n${NORMAL}`)
+  })
+
+  it('a sombra se achata junto: sem isto, a montanha achatada ainda faria a sombra da altura real', () => {
+    const depth = createGlobalDepthMaterial()
+    expect(depth.depthPacking).toBe(RGBADepthPacking)
+    const shader = shaderOf('depth')
+    depth.onBeforeCompile(shader)
+    expect(shader.uniforms.uFlatten).toBe(globalFlatten)
+    expect(shader.vertexShader).toContain(`#include <begin_vertex>\n${MORPH}`)
+  })
+
+  it('o mapa de normais da esfera entra no relevo junto com o achatamento, e achatado de todo fica igual ao dela', () => {
+    const normalMap = { isTexture: true }
+    const material = createGlobalMaterial('#808080', { isTexture: true }, normalMap)
+    expect(material.normalMap).toBe(normalMap)
+    setGlobalFlatten(material, 0)
+    expect(globalFlatten.value).toBe(0)
+    expect(material.normalScale.toArray()).toEqual([0, 0])
+    setGlobalFlatten(material, 0.4)
+    expect(globalFlatten.value).toBe(0.4)
+    expect(material.normalScale.toArray()).toEqual([0.4, 0.4])
+    // achatado de todo, a força do mapa é a da esfera (o padrão do three, 1)
+    setGlobalFlatten(material, 1)
+    expect(material.normalScale.toArray()).toEqual(new MeshStandardMaterial().normalScale.toArray())
   })
 })
 
@@ -123,7 +229,7 @@ describe('o mapa de normais no material (card C6)', () => {
 describe('visibleHit, o acerto do clique que a pessoa vê', () => {
   // um acerto do raio: a distância e a camada da malha (a esfera lisa não tem camada)
   const hit = (distance, reliefLayer) => ({ distance, object: { userData: reliefLayer ? { reliefLayer } : {} } })
-  const layerOf = { center: CENTER_LAYER, ring: RING_LAYER, coarse: COARSE_LAYER }
+  const layerOf = { center: CENTER_LAYER, ring: RING_LAYER, coarse: COARSE_LAYER, global: GLOBAL_LAYER, globe: GLOBE_LAYER }
 
   it.each([
     ['o centro, mesmo com o grosso e o anel mais perto', [hit(1, 'coarse'), hit(2, 'ring'), hit(3, 'center')], 2],
@@ -131,6 +237,8 @@ describe('visibleHit, o acerto do clique que a pessoa vê', () => {
     ['o grosso, onde o fino não está no raio (a linha da emenda)', [hit(1, 'coarse')], 0],
     ['o mais perto de cada camada', [hit(1, 'ring'), hit(2, 'center'), hit(3, 'center')], 1],
     ['o primeiro, sem relevo no raio (a esfera lisa)', [hit(1), hit(2)], 0],
+    ['o relevo da Lua inteira, mesmo com a esfera lisa mais perto (o fundo de uma bacia)', [hit(1, 'globe'), hit(2, 'global')], 1],
+    ['o grosso do polo, mesmo com o relevo da Lua inteira mais perto (a emenda)', [hit(1, 'global'), hit(2, 'coarse')], 1],
   ])('escolhe %s', (_, hits, expected) => {
     expect(visibleHit(hits)).toBe(hits[expected])
   })
@@ -141,8 +249,8 @@ describe('visibleHit, o acerto do clique que a pessoa vê', () => {
 
   it('escolhe a mesma malha que o estêncil mostra no pixel', () => {
     // todas as combinações de até uma malha de cada camada, em todas as ordens de distância
-    const kinds = ['center', 'ring', 'coarse']
-    for (let mask = 1; mask < 8; mask++) {
+    const kinds = ['center', 'ring', 'coarse', 'global', 'globe']
+    for (let mask = 1; mask < 1 << kinds.length; mask++) {
       const present = kinds.filter((_, i) => mask & (1 << i))
       for (const order of permutations(present)) {
         const hits = order.map((kind, i) => hit(i + 1, kind))

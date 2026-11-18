@@ -7,8 +7,8 @@
  * As medidas estão em raios da Lua: a esfera tem raio 1, e as distâncias da câmera e da luz são
  * contadas a partir do centro dela. O relevo está na altura real (reliefMesh.js diz o porquê). */
 import { OrbitControls } from '@react-three/drei'
-import { Canvas } from '@react-three/fiber'
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { Canvas, useFrame, useThree } from '@react-three/fiber'
+import { useEffect, useRef, useState } from 'react'
 import { Object3D } from 'three'
 
 import { scene } from '../data/scene.js'
@@ -21,16 +21,17 @@ import { useSubsolarPoint } from '../hooks/useSubsolarPoint.js'
 import { useTimedNotice } from '../hooks/useTimedNotice.js'
 import { CameraRig } from './CameraRig.jsx'
 import { CAMERA_FOV_DEG, heroDirection } from './framing.js'
+import { GlobalRelief } from './GlobalRelief.jsx'
 import { LandingAreasLayer } from './LandingAreasLayer.jsx'
 import { MoonGlobe } from './MoonGlobe.jsx'
 import { NearRelief } from './NearRelief.jsx'
 import { readMoonClick } from './picking.js'
 import { ReliefCap } from './ReliefCap.jsx'
 import { visibleHit } from './reliefLayers.js'
-import { smoothSphereThetaLength } from './reliefMesh.js'
+import { polarDistanceToAngle, smoothSphereThetaLength } from './reliefMesh.js'
 import { SiteMarker } from './SiteMarker.jsx'
 import { StarField } from './StarField.jsx'
-import { SUN_DISTANCE, SUN_TARGET, sunLightPosition } from './sunLight.js'
+import { SHADOW_MAP_SIZE, shadowFrame } from './sunLight.js'
 import './LunarScene.css'
 
 /* A câmera é a do CameraRig.jsx (o CameraControls do Drei): ela enquadra a Lua inteira no formato
@@ -67,23 +68,6 @@ const SUN_INTENSITY = 2.5
 /* Fraco de propósito: só para o lado escuro não sumir no fundo. Forte, ele apagaria a sombra, que
    é o assunto do produto. */
 const AMBIENT_INTENSITY = 0.06
-
-/* A caixa da sombra, em volta do polo (sunLight.js). O relevo vai até uns 0,22 do polo para cada
-   lado; 0,25 cobre ele visto de qualquer direção. Com 2048 pixels nesses 0,5, cada pixel da
-   sombra tem uns 420 m, menos que os 1,9 km entre os vértices da malha. 2048 é o tamanho que o
-   WebGL 2 garante em qualquer placa de vídeo. A profundidade cobre o relevo inteiro em volta da
-   distância da luz (SUN_DISTANCE). */
-const SHADOW_HALF_SIZE = 0.25
-const SHADOW_MAP_SIZE = 2048
-const SHADOW_NEAR = SUN_DISTANCE - 0.5
-const SHADOW_FAR = SUN_DISTANCE + 0.5
-
-/* No polo, o Sol fica a 1 ou 2 graus do horizonte, e a luz bate quase de raspão. Sem estes
-   descontos, a superfície faz sombra nela mesma em listras (o "shadow acne"). Os valores estão em
-   raios da Lua: o normalBias afasta a conta uns 350 m da superfície, menos que um pixel da
-   sombra. */
-const SHADOW_BIAS = -0.00005
-const SHADOW_NORMAL_BIAS = 0.0002
 
 /* O tipo de sombra do three. O padrão do React Three Fiber (o PCFSoftShadowMap) saiu do three
    0.186, que troca por este e avisa no console a cada página aberta. */
@@ -123,6 +107,59 @@ function Relief({ relief, color }) {
     <>
       <ReliefCap relief={relief} color={color} cover={cover} />
       <NearRelief manifest={relief.manifest} color={color} onCoverChange={setCover} />
+    </>
+  )
+}
+
+/* A luz do Sol e a caixa da sombra dela (sunLight.js). A caixa acompanha a câmera: a cada quadro,
+   antes de desenhar, o alvo, a posição da luz e o tamanho da caixa saem do shadowFrame. Fica aqui
+   dentro do Canvas porque precisa da câmera de cada quadro. subsolar: o ponto onde o Sol está a
+   pino; color: a cor da luz, do token. */
+function SunLight({ subsolar, color }) {
+  const invalidate = useThree((state) => state.invalidate)
+  const light = useRef(null)
+  /* O alvo da luz precisa estar na cena para o three saber onde ele fica; solto, ele conta como
+     se estivesse no centro, e a caixa da sombra sairia do lugar. */
+  const [target] = useState(() => new Object3D())
+
+  useFrame(({ camera, size }) => {
+    const sun = light.current
+    if (!sun) return
+    // o ângulo do meio da tela até a quina: a caixa cobre o chão até ali (shadowFrame)
+    const halfFov = (camera.fov * Math.PI) / 360
+    const viewHalfAngle = Math.atan(Math.tan(halfFov) * Math.hypot(1, size.width / size.height))
+    const frame = shadowFrame(camera.position.toArray(), subsolar, viewHalfAngle)
+    target.position.set(...frame.target)
+    target.updateMatrixWorld()
+    sun.position.set(...frame.lightPosition)
+    const box = sun.shadow.camera
+    box.left = -frame.halfSize
+    box.right = frame.halfSize
+    box.top = frame.halfSize
+    box.bottom = -frame.halfSize
+    box.near = frame.near
+    box.far = frame.far
+    box.updateProjectionMatrix()
+    sun.shadow.bias = frame.bias
+    sun.shadow.normalBias = frame.normalBias
+  })
+
+  // o Sol de outra data muda a luz por fora do React: a cena parada (card C9) não desenharia
+  useEffect(() => {
+    invalidate()
+  }, [subsolar, invalidate])
+
+  return (
+    <>
+      <primitive object={target} />
+      <directionalLight
+        ref={light}
+        target={target}
+        intensity={SUN_INTENSITY}
+        color={color}
+        castShadow
+        shadow-mapSize={[SHADOW_MAP_SIZE, SHADOW_MAP_SIZE]}
+      />
     </>
   )
 }
@@ -200,17 +237,12 @@ export function LunarScene({
   // a câmera nasce na direção da primeira vista; a distância certa para a tela vem do CameraRig
   const [cameraStart] = useState(() => heroDirection(subsolar).map((v) => v * CAMERA_START_DISTANCE))
 
-  const sunPosition = useMemo(() => sunLightPosition(subsolar), [subsolar])
-  /* O alvo da luz precisa estar na cena para o three saber onde ele fica; solto, ele conta como
-     se estivesse no centro, e a caixa da sombra sairia do polo. */
-  const sunTarget = useMemo(() => {
-    const target = new Object3D()
-    target.position.set(...SUN_TARGET)
-    return target
-  }, [])
-
   // Com o relevo, a esfera lisa abre um buraco no polo e a malha entra no lugar.
   const sphereThetaLength = relief ? smoothSphereThetaLength(relief.manifest.far.reachM) : Math.PI
+  /* Até onde o relevo do polo desenha, em latitude: a linha de ladrilhos da Lua inteira que fica
+     toda ao sul disto não precisa ser desenhada (globalChunks). Sem o relevo do polo, nenhuma
+     fica de fora. */
+  const skipSouthOfDeg = relief ? -90 + (polarDistanceToAngle(relief.manifest.far.reachM) * 180) / Math.PI : -90
 
   function handleMoonClick(event) {
     /* O raio do clique atravessa as malhas do relevo e a esfera lisa por baixo delas, e o React
@@ -255,28 +287,15 @@ export function LunarScene({
           <color attach="background" args={[token('--color-bg')]} />
           <StarField dateUtc={dateUtc} />
           <ambientLight intensity={AMBIENT_INTENSITY} />
-          <primitive object={sunTarget} />
-          <directionalLight
-            position={sunPosition}
-            target={sunTarget}
-            intensity={SUN_INTENSITY}
-            color={sunlightColor}
-            castShadow
-            shadow-mapSize={[SHADOW_MAP_SIZE, SHADOW_MAP_SIZE]}
-            shadow-camera-left={-SHADOW_HALF_SIZE}
-            shadow-camera-right={SHADOW_HALF_SIZE}
-            shadow-camera-top={SHADOW_HALF_SIZE}
-            shadow-camera-bottom={-SHADOW_HALF_SIZE}
-            shadow-camera-near={SHADOW_NEAR}
-            shadow-camera-far={SHADOW_FAR}
-            shadow-bias={SHADOW_BIAS}
-            shadow-normalBias={SHADOW_NORMAL_BIAS}
-          />
+          <SunLight subsolar={subsolar} color={sunlightColor} />
           <group onClick={handleMoonClick}>
             <MoonGlobe color={moonColor} thetaLength={sphereThetaLength} far={manifest?.far ?? null} />
             {/* Dentro do grupo do clique também o relevo fino: o grosso tem um buraco embaixo dele,
                 e a esfera lisa é aberta no polo; fora do grupo, o clique ali não acharia nada. */}
             {relief && <Relief relief={relief} color={moonColor} />}
+            {/* O relevo da Lua inteira, de perto, fora do polo: por cima da esfera lisa e por baixo
+                do relevo do polo (reliefLayers.js). */}
+            <GlobalRelief color={moonColor} skipSouthOfDeg={skipSouthOfDeg} />
           </group>
           <LandingAreasLayer areas={landing.areas} color={token('--color-success')} />
           {site && <SiteMarker site={site} relief={relief} />}

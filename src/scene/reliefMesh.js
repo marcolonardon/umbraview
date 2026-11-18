@@ -59,7 +59,8 @@ export function buildReliefCap(
   const flatFromM = reachM - overlapM
   const positions = []
   const layout = layOutGrid({ resolutionM, reachM, x0, y0, columns, rows }, { step, start }, (r, c, px, py, rho) => {
-    const fade = Math.max(0, Math.min(1, (flatFromM - rho) / fadeM))
+    // sem transição, nada desce: no alcance exato, a conta abaixo daria 0 / 0
+    const fade = fadeM > 0 ? Math.max(0, Math.min(1, (flatFromM - rho) / fadeM)) : 1
     const heightM = heights[r * columns + c] * heightScale * fade
     const radius = 1 + heightM / MOON_RADIUS_M
     const [x, y, z] = engineToScene(polarXYToUnit(px, py))

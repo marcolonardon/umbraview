@@ -118,6 +118,22 @@ describe('buildReliefCap, com uma grade pequena', () => {
     const maisLonge = v.reduce((longe, p) => (Math.hypot(p[0], p[2]) > Math.hypot(longe[0], longe[2]) ? p : longe))
     expect(Math.hypot(...maisLonge)).toBeCloseTo(1, CASAS_FLOAT32)
   })
+
+  it('sem transição e sem folga, a borda fica na altura real: o relevo da Lua inteira encosta nela', () => {
+    // com o relevo da Lua inteira em volta (globalTiles.js), descer a borda até o raio 1 abriria
+    // um degrau de alguns quilômetros em volta do polo
+    const { positions } = buildReliefCap(gradePequena({ altura: 2000, reachM: 2500 }), { step: 1, overlapM: 0, fadeM: 0 })
+    for (const p of vertices(positions)) expect(Math.hypot(...p)).toBeCloseTo(1 + 1000 / MOON_RADIUS_M, 6)
+  })
+
+  it('sem transição, o pixel exatamente no alcance também fica na altura real, e não vira NaN', () => {
+    // o pixel do canto fica a √(2000² + 2000²) m do polo: com o alcance igual, a conta da
+    // transição daria 0 / 0
+    const reachM = Math.hypot(2000, 2000)
+    const { positions } = buildReliefCap(gradePequena({ altura: 2000, reachM }), { step: 1, overlapM: 0, fadeM: 0 })
+    expect(positions.length / 3).toBe(25)
+    for (const p of vertices(positions)) expect(Math.hypot(...p)).toBeCloseTo(1 + 1000 / MOON_RADIUS_M, 6)
+  })
 })
 
 /* O ponto da projeção polar de cada vértice, lido de volta das posições. */

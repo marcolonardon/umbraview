@@ -26,6 +26,8 @@ import { SitePanel } from './panel/SitePanel.jsx'
 vi.mock('@react-three/fiber', () => ({
   Canvas: ({ children }) => <div data-testid="canvas">{children}</div>,
   useFrame: () => {},
+  // a luz do Sol pede o quadro novo quando a data muda (SunLight, em LunarScene.jsx)
+  useThree: (selector) => selector({ invalidate: () => {} }),
 }))
 // o Html é o marcador do ponto escolhido (card C3), que aparece quando o teste escolhe um ponto
 vi.mock('@react-three/drei', () => ({ OrbitControls: () => null, Html: ({ children }) => <div>{children}</div> }))
@@ -33,6 +35,8 @@ vi.mock('./hooks/useFarRelief.js', () => ({ useFarRelief: () => null }))
 // o céu de estrelas desenha com WebGL, que o jsdom não tem; as contas dele têm teste próprio
 vi.mock('./scene/StarField.jsx', () => ({ StarField: () => null }))
 vi.mock('./scene/MoonGlobe.jsx', () => ({ MoonGlobe: () => null }))
+// o relevo da Lua inteira baixa ladrilhos e monta malhas do three; tem teste próprio (globalTiles.test.js)
+vi.mock('./scene/GlobalRelief.jsx', () => ({ GlobalRelief: () => null }))
 vi.mock('./scene/CameraRig.jsx', () => ({ CameraRig: () => null }))
 vi.mock('./scene/LandingAreasLayer.jsx', () => ({ LandingAreasLayer: () => null }))
 // a vista do sistema desenha com WebGL; o teste confere só que o App entrega a data e a troca de vista
