@@ -12,10 +12,12 @@
 import { CameraControls, CameraControlsImpl } from '@react-three/drei'
 import { useFrame, useThree } from '@react-three/fiber'
 import { useEffect, useRef } from 'react'
+import { Spherical } from 'three'
 
 import { latLonToScene } from './coordinates.js'
 import {
-  EARTH_RADIUS, approach, clampPolar, fitDistance, heroDirection, lensShift, nearestAzimuth, orbitAngles, shortestTurn,
+  EARTH_RADIUS, ROTATE_SPEED_MAX, WHEEL_DOLLY_SPEED, approach, azimuthSpeedAt, clampPolar, dollySpeedAt, fitDistance,
+  heroDirection, lensShift, nearestAzimuth, orbitAngles, rotateSpeedAt, shortestTurn,
 } from './framing.js'
 
 const { ACTION } = CameraControlsImpl
@@ -41,10 +43,6 @@ const ENTRY_DISTANCE_FACTOR = 1.55
    perto fica onde estava: subir de volta a cada clique tiraria a pessoa do relevo que ela olhava. */
 const SITE_DISTANCE = 1.25
 
-/* Quanto a roda anda por passo, em vezes o padrão dos controles: o zoom vai do chão da Lua até o
-   céu virar um aglomerado, quase 3.000 vezes a distância, e no passo padrão a roda não chegava. */
-const DOLLY_SPEED = 2
-
 // Devagar: é um convite a mexer, não uma animação para assistir (o mesmo ritmo da v1).
 const AUTO_ROTATE_RAD_PER_S = 0.03
 
@@ -61,6 +59,29 @@ const SYSTEM_MIN_DISTANCE = EARTH_RADIUS * 1.5
    tempo parado, e o primeiro quadro do voo recebe só os milissegundos de verdade. */
 function dropIdleTime(clock) {
   clock.getDelta()
+}
+
+// o destino da câmera, lido a cada quadro sem criar um objeto novo
+const endSpherical = new Spherical()
+
+/* A roda (e a pinça de dois dedos) e o arrasto pela altura da câmera (dollySpeedAt e rotateSpeedAt,
+   em framing.js): perto do chão, um passo da roda pulava centenas de quilômetros, e o chão andava
+   centenas de vezes mais que o mouse. A distância é a do destino, e não a de agora: passos da roda
+   seguidos se somam sobre o destino, antes de a câmera chegar lá. Na vista Terra–Lua–Sol, a câmera
+   mira a Terra, e a distância não é até a Lua: ficam as velocidades de sempre. */
+function applyHandSpeeds(c, isSystem) {
+  if (isSystem) {
+    c.dollySpeed = WHEEL_DOLLY_SPEED
+    c.azimuthRotateSpeed = ROTATE_SPEED_MAX
+    c.polarRotateSpeed = ROTATE_SPEED_MAX
+    return
+  }
+  // radius: a distância até o centro da Lua; phi: o ângulo polar, que perto do polo deixa o giro
+  // para os lados mais curto no chão (azimuthSpeedAt)
+  const { radius, phi } = c.getSpherical(endSpherical, true)
+  c.dollySpeed = dollySpeedAt(radius)
+  c.azimuthRotateSpeed = azimuthSpeedAt(radius, phi)
+  c.polarRotateSpeed = rotateSpeedAt(radius)
 }
 
 /* Quanto a distância da câmera pode fugir da do enquadramento e a Lua inteira ainda contar como
@@ -145,10 +166,10 @@ export function CameraRig({
     c.touches.three = ACTION.NONE
     c.minPolarAngle = clampPolar(0)
     c.maxPolarAngle = clampPolar(Math.PI)
-    c.dollySpeed = DOLLY_SPEED
     const [x, y, z] = heroDirection(subsolar)
     const from = reducedMotion ? fit : Math.min(maxDistance, fit * ENTRY_DISTANCE_FACTOR)
     c.setLookAt(x * from, y * from, z * from, 0, 0, 0, false)
+    applyHandSpeeds(c, false)
     if (!reducedMotion) {
       c.smoothTime = SMOOTH_ENTRY_S
       c.dollyTo(fit, true).then(() => {
@@ -200,6 +221,8 @@ export function CameraRig({
       if (s.x !== shiftTarget.x || s.y !== shiftTarget.y) invalidate()
     }
     if (autoRotate) controls.current?.rotate(AUTO_ROTATE_RAD_PER_S * delta, 0, false)
+    // há quadro justamente enquanto a câmera anda (card C9), que é quando a altura muda
+    if (controls.current) applyHandSpeeds(controls.current, mode.current === 'system')
   })
 
   /* O voo até o ponto escolhido, em dois trechos encadeados: a câmera gira em volta da Lua até
@@ -371,6 +394,9 @@ export function CameraRig({
     if (c && mode.current === 'wide' && Math.abs(c.distance - latest.current.fit) > WIDE_TOLERANCE * latest.current.fit) {
       changeMode(mode, wide, latest, 'free')
     }
+    /* Cada passo da roda avisa aqui, logo depois de mudar o destino: o passo seguinte, que pode
+       chegar antes do próximo quadro numa roda girada depressa, já usa a velocidade da altura nova. */
+    if (c) applyHandSpeeds(c, mode.current === 'system')
     latest.current.onUserStart?.()
   }
 

@@ -3,8 +3,9 @@ import { describe, expect, it } from 'vitest'
 
 import { latLonToScene } from './coordinates.js'
 import {
-  CAMERA_FOV_DEG, EARTH_RADIUS, FRAME_MARGIN, SYSTEM_COMPRESSION, approach, clampPolar, fitDistance, heroDirection,
-  lensShift, nearestAzimuth, orbitAngles, shortestTurn, skyAngle, sunSideStart, systemCamera, systemScale, systemViewRadius,
+  CAMERA_FOV_DEG, EARTH_RADIUS, FRAME_MARGIN, ROTATE_SPEED_MAX, SYSTEM_COMPRESSION, WHEEL_DOLLY_SPEED, approach, clampPolar,
+  azimuthSpeedAt, dollySpeedAt, fitDistance, heroDirection, lensShift, nearestAzimuth, orbitAngles, rotateSpeedAt, shortestTurn, skyAngle,
+  sunSideStart, systemCamera, systemScale, systemViewRadius,
 } from './framing.js'
 
 const DEG = Math.PI / 180
@@ -203,5 +204,127 @@ describe('a câmera da vista do sistema nasce com o Sol à esquerda (sunSideStar
     expect(x).toBeCloseTo(6.4 * Math.sin(190 * DEG), 12)
     expect(y).toBe(2.4)
     expect(z).toBeCloseTo(6.4 * Math.cos(190 * DEG), 12)
+  })
+})
+
+/* As contas do camera-controls 3.1.2 (node_modules/camera-controls/dist/camera-controls.module.js),
+   escritas aqui à parte, como régua:
+   - um passo da roda do mouse no Windows (deltaY de 100) leva a distância até o centro da Lua de d
+     para d · 0,95^(−(100 / 30) · dollySpeed), no _dollyInternal; para dentro, o expoente troca de sinal;
+   - arrastar p pixels gira a câmera 2π · rotateSpeed · p / altura da tela, no _rotateInternal. */
+const wheelStep = (distance, speed, notches = 1) => distance * Math.pow(0.95, -(100 / 30) * speed * notches)
+const altitudeKm = (distance) => (distance - 1) * 1737.4
+const MIN_DISTANCE = 1.02
+
+describe('a roda do mouse anda pela altura, e não pela distância até o centro da Lua (dollySpeedAt)', () => {
+  it('um passo para fora multiplica a altura pelo mesmo tanto perto do chão, a 430 km e de longe', () => {
+    // sem isto, a 35 km um passo levava a câmera a 757 km (medido no navegador em 17/11/2026)
+    const factors = [MIN_DISTANCE, 1.05, 1.25, 4, 50].map((d) => (wheelStep(d, dollySpeedAt(d)) - 1) / (d - 1))
+    for (const factor of factors) {
+      expect(factor).toBeGreaterThan(1.3)
+      expect(factor).toBeLessThan(1.45)
+    }
+    expect(Math.max(...factors) / Math.min(...factors)).toBeLessThan(1.06)
+  })
+
+  it('um passo para dentro divide a altura pelo mesmo tanto, sem pular para o chão', () => {
+    // sem isto, de 806 km um passo levava a 70 km
+    for (const d of [1.05, 1.25, 1.46, 4]) {
+      const factor = (d - 1) / (wheelStep(d, dollySpeedAt(d), -1) - 1)
+      expect(factor, `a ${Math.round(altitudeKm(d))} km`).toBeGreaterThan(1.3)
+      expect(factor, `a ${Math.round(altitudeKm(d))} km`).toBeLessThan(1.55)
+    }
+  })
+
+  it('da Lua inteira até o chão são uns 15 passos, e não 5', () => {
+    // a Lua inteira na janela maximizada do CIT-DES06: uns 4,1 raios do centro
+    let d = 4.1
+    let steps = 0
+    while (d > MIN_DISTANCE && steps < 100) {
+      d = Math.max(MIN_DISTANCE, wheelStep(d, dollySpeedAt(d), -1))
+      steps++
+    }
+    expect(steps).toBeGreaterThanOrEqual(12)
+    expect(steps).toBeLessThanOrEqual(18)
+  })
+
+  it('de longe, o passo é o de hoje: a roda continua chegando ao céu de estrelas', () => {
+    expect(dollySpeedAt(3000)).toBeCloseTo(WHEEL_DOLLY_SPEED, 2)
+    expect(dollySpeedAt(100)).toBeGreaterThan(WHEEL_DOLLY_SPEED * 0.98)
+  })
+
+  it('nunca para nem anda ao contrário, nem dentro da Lua', () => {
+    expect(dollySpeedAt(MIN_DISTANCE)).toBeGreaterThan(0)
+    expect(dollySpeedAt(1)).toBe(0)
+    expect(dollySpeedAt(0.5)).toBe(0)
+  })
+})
+
+describe('o arrasto acompanha a mão em qualquer altura (rotateSpeedAt)', () => {
+  // quanto o chão embaixo do meio da tela anda, em pixels da tela, por pixel de arrasto
+  function groundPerDragPixel(distance) {
+    const height = 761
+    const turnPerPixel = (2 * Math.PI * rotateSpeedAt(distance)) / height
+    const groundPerScreenPixel = (2 * (distance - 1) * Math.tan((CAMERA_FOV_DEG * DEG) / 2)) / height
+    return turnPerPixel / groundPerScreenPixel
+  }
+
+  it('perto do chão, o chão anda o mesmo que o mouse', () => {
+    // sem isto, a 35 km o chão andava 381 vezes mais que o mouse (medido no navegador em 17/11/2026)
+    for (const d of [MIN_DISTANCE, 1.06, 1.25, 2]) expect(groundPerDragPixel(d), `a ${Math.round(altitudeKm(d))} km`).toBeCloseTo(1, 6)
+  })
+
+  it('nunca gira mais rápido que hoje, e de longe gira como hoje', () => {
+    for (const d of [MIN_DISTANCE, 1.25, 4, 12, 100, 3000]) expect(rotateSpeedAt(d)).toBeLessThanOrEqual(ROTATE_SPEED_MAX)
+    expect(rotateSpeedAt(100)).toBe(ROTATE_SPEED_MAX)
+  })
+
+  it('só cresce com a altura, e nunca para por completo', () => {
+    let previous = 0
+    for (let d = MIN_DISTANCE; d < 20; d *= 1.05) {
+      const speed = rotateSpeedAt(d)
+      expect(speed).toBeGreaterThan(0)
+      expect(speed).toBeGreaterThanOrEqual(previous)
+      previous = speed
+    }
+  })
+})
+
+describe('o arrasto para os lados também acompanha a mão perto do polo (azimuthSpeedAt)', () => {
+  /* Arrastar para os lados gira a câmera em volta do eixo da Lua: o ponto embaixo dela anda o giro
+     vezes o seno do ângulo polar da câmera (o cosseno da latitude). Em Haworth, a 87°S, isso é 0,05:
+     com a velocidade do arrasto para cima e para baixo, o chão andava umas 19 vezes menos que o
+     mouse (sentido pelo Marco no navegador em 17/11/2026). */
+  function groundPerSideDragPixel(distance, latDeg) {
+    const height = 761
+    const polar = (90 - latDeg) * DEG
+    const turnPerPixel = (2 * Math.PI * azimuthSpeedAt(distance, polar)) / height
+    const groundPerScreenPixel = (2 * (distance - 1) * Math.tan((CAMERA_FOV_DEG * DEG) / 2)) / height
+    return (turnPerPixel * Math.sin(polar)) / groundPerScreenPixel
+  }
+
+  it('perto do chão, em qualquer latitude, o chão anda para o lado o mesmo que o mouse', () => {
+    for (const lat of [-87, -60, 0, 45]) {
+      for (const d of [MIN_DISTANCE, 1.06, 1.25]) {
+        expect(groundPerSideDragPixel(d, lat), `a ${lat}°, ${Math.round(altitudeKm(d))} km`).toBeCloseTo(1, 6)
+      }
+    }
+  })
+
+  it('no equador, é a mesma velocidade do arrasto para cima e para baixo', () => {
+    expect(azimuthSpeedAt(1.25, Math.PI / 2)).toBeCloseTo(rotateSpeedAt(1.25), 12)
+  })
+
+  it('nunca gira mais rápido que hoje, nem em cima do polo, onde o seno quase zera', () => {
+    for (const polar of [0, 0.5 * DEG, Math.PI / 2, Math.PI]) {
+      for (const d of [MIN_DISTANCE, 1.25, 4, 100]) {
+        const speed = azimuthSpeedAt(d, polar)
+        expect(Number.isFinite(speed)).toBe(true)
+        expect(speed).toBeGreaterThan(0)
+        expect(speed).toBeLessThanOrEqual(ROTATE_SPEED_MAX)
+      }
+    }
+    // de longe, a velocidade de hoje
+    expect(azimuthSpeedAt(100, 0.3)).toBe(ROTATE_SPEED_MAX)
   })
 })

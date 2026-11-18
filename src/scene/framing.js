@@ -81,6 +81,56 @@ export function clampPolar(polar) {
   return Math.max(POLAR_EDGE, Math.min(Math.PI - POLAR_EDGE, polar))
 }
 
+/* Quanto a roda anda por passo, em vezes o padrão dos controles, com a câmera longe da Lua: o zoom
+   vai do chão da Lua até o céu virar um aglomerado, quase 3.000 vezes a distância, e no passo
+   padrão a roda não chegava. No Windows, um passo da roda multiplica a distância por 1,41. */
+export const WHEEL_DOLLY_SPEED = 2
+
+/* O dollySpeed dos controles com a câmera a `distance` raios do centro da Lua.
+   O camera-controls multiplica a distância até o centro a cada passo da roda (e da pinça de dois
+   dedos): perto do chão, isso é um pulo enorme na altura. A 35 km, um passo para fora levava a
+   câmera a 757 km, e de 806 km um passo para dentro levava a 70 km (medido no navegador do
+   CIT-DES06 em 17/11/2026, na main): da Lua inteira até o chão eram 5 passos.
+   Com a velocidade proporcional a (d − 1) / d, o passo multiplica a altura, e não a distância:
+   para passos pequenos, ln(altura nova / altura) = ln(distância nova / distância) · d / (d − 1).
+   Um passo inteiro da roda é grande para essa conta, e ela erra um pouco: para fora, a altura vai
+   ×1,34 perto do chão e ×1,41 longe; para dentro, ÷1,51 e ÷1,43 (framing.test.js). De longe, a
+   velocidade é a de hoje (WHEEL_DOLLY_SPEED). Dentro da Lua, zero: a roda não anda. */
+export function dollySpeedAt(distance) {
+  return (WHEEL_DOLLY_SPEED * Math.max(0, distance - 1)) / distance
+}
+
+/* A velocidade de giro dos controles de hoje, o padrão do camera-controls. */
+export const ROTATE_SPEED_MAX = 1
+
+/* O azimuthRotateSpeed e o polarRotateSpeed dos controles com a câmera a `distance` raios do centro
+   da Lua: o chão embaixo do meio da tela anda junto com o mouse.
+   O camera-controls gira a câmera 2π · velocidade · pixels / altura da tela, em qualquer altura. A
+   35 km, arrastar 20 pixels movia o chão 351 km, com a tela inteira mostrando 22 km de largura: o
+   chão andava 381 vezes mais que o mouse (medido no navegador do CIT-DES06 em 17/11/2026, na main).
+   Um pixel da tela, no meio dela, cobre 2 · altura · tan(fov / 2) / altura da tela de chão (em
+   raios, que é o ângulo no centro da Lua); igualando ao giro de um pixel de arrasto, a velocidade é
+   altura · tan(fov / 2) / π. Ela fica presa na de hoje: de longe, com a Lua pequena na tela, girar
+   na velocidade da mão seria rápido demais. */
+export function rotateSpeedAt(distance, fovDeg = CAMERA_FOV_DEG) {
+  const follow = (Math.max(0, distance - 1) * Math.tan((fovDeg * DEG) / 2)) / Math.PI
+  return Math.min(ROTATE_SPEED_MAX, follow)
+}
+
+/* O azimuthRotateSpeed dos controles: a velocidade de rotateSpeedAt dividida pelo seno do ângulo
+   polar da câmera (`polar`, a partir de +y, o phi do Spherical do three), que é o cosseno da
+   latitude do ponto embaixo dela.
+   Arrastar para os lados gira a câmera em volta do eixo da Lua, e o ponto embaixo dela anda o giro
+   vezes esse seno. Em Haworth, a 87°S, ele vale 0,05: com a velocidade do arrasto para cima e para
+   baixo, o chão andava para os lados umas 19 vezes menos que o mouse (o Marco sentiu no navegador
+   em 17/11/2026). O seno nunca fica menor que o do POLAR_EDGE, onde clampPolar segura a câmera, e a
+   velocidade fica presa na de hoje: em cima do polo, ela não dispara. */
+export function azimuthSpeedAt(distance, polar, fovDeg = CAMERA_FOV_DEG) {
+  const follow = (Math.max(0, distance - 1) * Math.tan((fovDeg * DEG) / 2)) / Math.PI
+  const sine = Math.max(Math.sin(POLAR_EDGE), Math.sin(polar))
+  return Math.min(ROTATE_SPEED_MAX, follow / sine)
+}
+
 /* O passo de um valor que persegue o alvo sem pular: a fração que falta cai pela metade a cada
    halfLifeS segundos. Devolve o alvo quando a diferença some, para quem chama saber que parou e
    não pedir mais quadros (a cena parada não desenha, card C9). */
