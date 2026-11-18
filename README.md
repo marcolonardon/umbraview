@@ -77,6 +77,11 @@ installs everything on Windows, from scratch.
   site is chosen by clicking its mark or in the list, which also turns the camera to it. It is
   where the mission simulation will be drawn (cards C14 to C16); the path of a mission is not
   there yet.
+- The orbit propagator of the engine (`src/engine/orbit.js`, card C14): given a position, a speed
+  and an instant, where a spacecraft is later, under the gravity of the Earth, the Moon and the
+  Sun, each in its real position. Checked against the flown path of Artemis I, from JPL Horizons:
+  within 3 m after 4 hours of free flight, and 40 m after 20 hours. Nothing on screen uses it
+  yet: it is what the mission simulation is computed with (cards C15 and C16).
 - In the panel, the list of landing sites, which also chooses the site, including by keyboard
   alone (card I2): the IM-2 landing and the center of 7 of the 9 Artemis III candidate regions
   (card E16). Also in the panel, the date and time in UTC, which start at the time the page was
@@ -292,6 +297,7 @@ umbraview/
 │   │   ├── artemis-regions.geojson  the outline of the Artemis III candidate regions, from the USGS (card E16)
 │   │   ├── gcat-launch-points.tsv   the launch pads of the list of launch sites, rows copied from GCAT (card C13)
 │   │   ├── gcat-lunar-launches.tsv  one launch to the Moon from each of those pads, rows copied from GCAT
+│   │   ├── horizons-artemis1.mjs    generates horizonsArtemis1.json, from JPL Horizons (card C14)
 │   │   ├── horizons-reference.mjs   generates horizonsEarthSite.json, from JPL Horizons
 │   │   ├── polar_reference.py
 │   │   ├── requirements.txt
@@ -314,6 +320,7 @@ umbraview/
 │   │   └── systemView.js            system view texts (the Earth, the Moon and the Sun)
 │   ├── engine/                      the calculation engine (card E1)
 │   │   ├── fixtures/
+│   │   │   ├── horizonsArtemis1.json   the flown path of Orion in Artemis I according to JPL Horizons, for the propagator test
 │   │   │   ├── horizonsEarthSite.json  a point of the Earth's surface in space according to JPL Horizons, for the launch site test
 │   │   │   ├── polarReference.json  x/y position from pyproj, for the projection test
 │   │   │   ├── reliefSamples.json   heights read from NASA's files, for the site's terrain test
@@ -325,6 +332,7 @@ umbraview/
 │   │   ├── horizon.js               the horizon of a point, direction by direction
 │   │   ├── landingAreas.js          which points of a grid have a landing window in the period of a date
 │   │   ├── landingGridFiles.js      the landing grid files, and the map mask for the scene
+│   │   ├── orbit.js                 the orbit propagator: a spacecraft under the gravity of the Earth, the Moon and the Sun (card C14)
 │   │   ├── relief.js                the terrain height at a point: polar, cylindrical or tiled grid
 │   │   ├── reliefFiles.js           the site's terrain files become the horizon layers
 │   │   ├── series.js                Sun and Earth hour by hour, sunset and landing windows

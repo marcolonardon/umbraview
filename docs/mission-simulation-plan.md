@@ -101,6 +101,12 @@ So the three bodies as point masses, in their real positions, are enough for a l
 and the Sun cannot be left out. Where the remaining 56 km come from was not investigated (Orion's
 own thrusters during the coast are a candidate).
 
+*Added on 18/11/2026, with card C14 built:* the code and its tests are now in the repository
+(`src/engine/orbit.js`), and they give the same table. The 56 km are not the model's error: the
+Horizons file has 5 seams in this stretch, where the position jumps by 3 to 24 km from one instant
+to the next. Between the seams the propagator stays within 3 m of JPL after 4 hours, and within
+40 m after 20 hours. The measurements are in card C14 of the [backlog](backlog.md).
+
 **The aiming.** 35 missions to the IM-2 landing site: landing dates every 2 days from 01/12 to
 27/12/2026 from Kennedy, plus Kourou, Baikonur, Mahia and Alcântara on four of those dates, and
 both sides of the Moon on the first date. Parking orbit at 185 km, 4 days of crossing, pass at

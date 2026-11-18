@@ -1803,7 +1803,9 @@ and `verify` passes.
 
 ### C14 · The propagator, checked against a flown trajectory
 
-**Status:** proposed on 17/11; waits for Enzo's OK · **Depends on:** nothing
+**Status:** built on 18/11, on the branch `feat/c14-propagador` of Marco's fork
+(`marcolonardon/umbraview`), not committed yet; it waits for Enzo's OK and for the PR number ·
+**Depends on:** nothing
 
 **What it is for.** To draw an orbit that is real, the engine has to move a spacecraft under
 gravity. This card is only that: given a position, a speed and an instant, where the spacecraft
@@ -1831,6 +1833,75 @@ is later. Card C15 uses it to design the mission.
 
 **Done when.** The three groups of tests pass, the differences measured against Artemis I are
 written in this card, no file in `src/engine/` imports React, and `verify` passes.
+
+**How it turned out.**
+- **What the engine has now** (`src/engine/orbit.js`): `createEphemeris(startMs, endMs)`, the Moon
+  and the Sun of a period in a grid; `propagate(state, untilMs, options)`, the spacecraft at a
+  later instant; `propagateToMoonPass(state, limitMs, options)`, the spacecraft at its closest
+  pass by the Moon, seen from the Moon, or `null`; and `GM_KM3_S2`, the three constants from JPL.
+  A state is `{ dateMs, positionKm, velocityKmS }`, counted from the center of the Earth in the
+  equatorial J2000 frame, the same as `earthSiteEquatorialKm` of card C13. The options are the
+  ephemeris, `gravity: { moon, sun }` from 0 to 1 (for card C15 to switch them on in steps) and
+  `onStep`, called at every step (for card C16 to keep the path).
+- **The parameters** are in `ORBIT`, in `src/engine/config.js`, each with what was measured: the
+  step is 1% of the time gravity takes to change the path at that place (8 s in low Earth orbit),
+  with a ceiling of 120 s, and the Moon and the Sun are read every hour and interpolated with
+  their speed (8 cm from the direct reading for the Moon).
+- **The 56 km of the draft are not the propagator's error: they are seams in the Horizons file.**
+  Horizons says the Artemis I file is NASA/JSC navigation data, "concatenated". Measured with the
+  states every 10 minutes: in the 68 hours of the stretch the position jumps 5 times, by 3 to
+  24 km from one instant to the next with almost no change in speed (17/11 17:50, 18/11 04:50,
+  19/11 03:50, 19/11 18:30 and 20/11 07:10 TDB), which a spacecraft does not do. Why each seam is
+  there was not verified. The fixture has 17 pieces of 4 hours; the seams fall in 5 of them, and
+  the other 12 are free flight from end to end.
+- **Measured against Artemis I**, on 18/11/2026, the distance between our position and JPL's:
+
+  | Gravity in the model | 12 pieces of 4 h with no seam | 20 h with no seam | 68 h, seams included |
+  |---|---|---|---|
+  | Earth, Moon and Sun | 0.7 to 2.8 m | 40 m | 56.1 km (17.0 km at 24 h, 42.8 km at 48 h) |
+  | Earth and Moon | 1.8 to 2.8 km | 56 km | 660 km |
+  | Earth only | 3.9 to 35 km | 177 km | 2,470 km |
+
+  The last column is the test the card asked for, and it gives the draft's numbers. The first two
+  are what measures the propagator: in 4 hours the spacecraft travels 10 to 15 thousand km, and
+  the calculation ends within 3 m of where it was. Where the 40 m in 20 hours come from was not
+  investigated (the pressure of sunlight and Orion's attitude thrusters are candidates).
+- **The stretch has no burn, as far as the data show.** With the same 10-minute states, the speed
+  of the spacecraft changes suddenly on 17/11 at 11:30 TDB (0.22 m/s) and on 20/11 at 12:10 TDB
+  (0.87 m/s), which looks like two route corrections (not verified against NASA's record), and the
+  stretch is between them.
+- **The closest pass.** Following only gravity from 17/11 13:59 UTC, the calculation passes
+  1,887 km from the center of the Moon on 21/11/2022 at 12:56:01 UTC. The flown path, in the same
+  Horizons file, passed at 1,868 km between 12:58 and 12:59 TDB, after two route corrections and a
+  burn on arrival that the calculation does not have: 19 km and a minute and a half apart, four
+  days later.
+- **The time scale.** The engine turns an instant into a date with the astronomy-engine's
+  `MakeTime`, which for 2022 puts the ephemeris time 73.2 s after UTC, and not the real 69.2 s.
+  With the real one the comparison gave the same (2.2 m against 2.8 m in the 4-hour pieces), so
+  the propagator follows the rest of the engine.
+- **How long it takes**, in Node 25 on Marco's computer: a path of 4 days, 0.3 ms; up to the pass
+  by the Moon, 1 ms; the grid of the Moon and the Sun for 6 days, 2 ms. The draft of 17/11 took
+  33 ms for 68 hours, and 458 to 877 ms for one mission. Card C15 measures again in the browser
+  before deciding whether the mission needs the Worker.
+- **Left out, on purpose:** the propagator only goes forward in time, does not notice a path that
+  crosses the ground of the Earth or of the Moon, and a burn is a change of speed made by whoever
+  calls it, between two calls.
+
+**Verified** on 18/11/2026:
+- `orbit.test.js` has 26 tests in five groups (the constants, only the Earth, the grid, Artemis I
+  and the pass by the Moon), and `config.test.js` has 2 more for `ORBIT`.
+- Test first: against a skeleton that returned the spacecraft where it was, 17 of the 23 tests of
+  that moment failed. Of the 6 that passed, one should not have (the energy over 10 orbits), and it
+  now asks for 10 and a half orbits, with the spacecraft on the other side of the Earth.
+- Each fault planted in `orbit.js` fails its own tests: without the pull of the Moon and the Sun
+  on the Earth itself, 7 tests fail; with the Sun on the opposite side, 7; with the Moon 1%
+  heavier, the 3 that measure in meters; with the pass taken at the end of the step, without
+  refining, the one that asks for a sideways speed; with one wrong weight in the Moon's
+  interpolated speed, 5; with one weight of the integrator wrong by one part in 10 million, the
+  energy test.
+- `npm run verify` passes, with 735 tests in 62 files and no lint warning.
+- Not verified: the time in the browser and on the team's other computers (nothing on screen uses
+  the propagator yet), and the fixture against a second source.
 
 ### C15 · The mission in the engine: from the launch site to the landing window
 
