@@ -3,7 +3,7 @@
  * e não no fuso do computador de quem usa. */
 import { describe, expect, it } from 'vitest'
 
-import { formatDegrees, formatDuration, formatPercent, formatUtc } from './format.js'
+import { formatDegrees, formatDuration, formatPercent, formatUtc, formatUtcDate } from './format.js'
 
 describe('formatDegrees', () => {
   it('mostra uma casa decimal e o símbolo de grau', () => {
@@ -28,6 +28,14 @@ describe('formatUtc', () => {
   it('mostra a data e a hora em UTC, e não no fuso de quem usa', () => {
     // em Tóquio (UTC+9) seriam 12:00; o painel tem que mostrar 03:00
     expect(formatUtc(new Date('2026-11-14T03:00:00Z'))).toBe('14 Nov 2026, 03:00 UTC')
+  })
+})
+
+describe('formatUtcDate', () => {
+  it('mostra só a data, em UTC, e não a do fuso de quem usa', () => {
+    // em Tóquio (UTC+9) já seria dia 27; o lançamento do IM-2 foi no dia 26 pelo relógio da Flórida e 27 em UTC
+    expect(formatUtcDate(new Date('2025-02-27T00:16:30Z'))).toBe('27 Feb 2025')
+    expect(formatUtcDate(new Date('2025-02-26T23:59:00Z'))).toBe('26 Feb 2025')
   })
 })
 

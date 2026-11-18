@@ -1,6 +1,8 @@
 import { useState } from 'react'
 
 import { app } from './data/app.js'
+import { launchSites } from './data/launchSites.js'
+import { missionView } from './data/missionView.js'
 import { siteSky } from './data/siteSky.js'
 import { sites } from './data/sites.js'
 import { systemView } from './data/systemView.js'
@@ -11,6 +13,7 @@ import { SiteList } from './panel/SiteList.jsx'
 import { SitePanel } from './panel/SitePanel.jsx'
 import { SiteSky } from './panel/SiteSky.jsx'
 import { LunarScene } from './scene/LunarScene.jsx'
+import { MissionView } from './scene/MissionView.jsx'
 import { SystemView } from './scene/SystemView.jsx'
 import './App.css'
 
@@ -39,8 +42,12 @@ export default function App() {
   /* Se o mapa das áreas com janela de pouso está ligado na cena. Fica aqui, com a data e o ponto,
      porque é a mesma data que decide o mapa e os números do painel. */
   const [showLandingAreas, setShowLandingAreas] = useState(false)
-  /* Qual vista ocupa a região da cena: 'moon', a Lua de perto, ou 'system', a Terra, a Lua e o Sol. */
+  /* Qual vista ocupa a região da cena: 'moon', a Lua de perto; 'system', a Terra, a Lua e o Sol; ou
+     'mission', a Terra e a Lua em escala, com as bases de lançamento (card C13). */
   const [view, setView] = useState('moon')
+  /* A base de lançamento escolhida na vista da missão (o id dela), ou null. Fica aqui, e não na
+     vista: trocar de vista desmonta a da missão, e a escolha se perderia. */
+  const [launchSiteId, setLaunchSiteId] = useState(null)
   const { status, sky } = useSiteSky(site, dateUtc)
 
   return (
@@ -65,8 +72,11 @@ export default function App() {
               <button className="app__view" type="button" aria-pressed={view === 'system'} onClick={() => setView('system')}>
                 {systemView.viewSystem}
               </button>
+              <button className="app__view" type="button" aria-pressed={view === 'mission'} onClick={() => setView('mission')}>
+                {missionView.viewMission}
+              </button>
             </div>
-            {view === 'moon' ? (
+            {view === 'moon' && (
               <LunarScene
                 dateUtc={dateUtc}
                 site={site}
@@ -74,9 +84,17 @@ export default function App() {
                 showLandingAreas={showLandingAreas}
                 onToggleLandingAreas={() => setShowLandingAreas((shown) => !shown)}
               />
-            ) : (
-              // a key recomeça o relógio da vista quando a data muda: a hora 300 de uma data não é a de outra
-              <SystemView key={dateUtc.getTime()} dateUtc={dateUtc} onDateChange={setDateUtc} />
+            )}
+            {/* a key recomeça o relógio da vista quando a data muda: a hora 300 de uma data não é a de outra */}
+            {view === 'system' && <SystemView key={dateUtc.getTime()} dateUtc={dateUtc} onDateChange={setDateUtc} />}
+            {view === 'mission' && (
+              <MissionView
+                key={dateUtc.getTime()}
+                dateUtc={dateUtc}
+                launchSites={launchSites}
+                launchSiteId={launchSiteId}
+                onLaunchSiteChange={setLaunchSiteId}
+              />
             )}
           </section>
 

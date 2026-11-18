@@ -1,0 +1,20 @@
+# Linhas copiadas em 18/11/2026 da tabela de pontos de lancamento do GCAT (lp.tsv), sem mudar nada:
+# J. McDowell, General Catalog of Artificial Space Objects, https://planet4589.org/space/gcat (CC-BY).
+# So as plataformas das bases de src/data/launchSites.js; o teste launchSites.test.js amarra a lista a elas.
+#Site	Code	UCode	Type	StateCode	TStart	TStop	ShortName	Name	Location	Longitude	Latitude	Error	Parent	ShortEName	EName	UName
+# Updated 2026 Nov 18 0143:10
+ALCA	VLS	-	LP	-	1997 Nov  2	*	ALCA  VLS	VLS pad, Alcantara	Alcantara, Maranhao, Brasil	    -44.3680 	   -2.3177 	0.0020 	AEB	-	-	-
+CC	SLC41	LC41	LP	-	1965 Dec 21	*	CC    SLC41	Space Launch Complex 41, Cape Canaveral	-	    -80.5831 	   28.5833 	0.0002 	USAF	-	-	-
+CSG	ELA3	-	LP	-	1996	*	CSG   ELA3	Ensemble de Lancement Ariane 3, CSG	-	    -52.7687 	    5.2375 	0.0010 	CNES	-	-	-
+GIK-5	LC81/23	-	LP	-	1965	*	GIK-5 LC81/23	PU23, Ploshchadka 81L, GIK-5, Baykonur, Kazakstan	-	     62.9830 	   46.0590 	0.0150 	RVSN	-	-	-
+KASC	M1	M	LP	-	1966	1995	KASC  M1	Refurbished Mu Pad, Kagoshima Space Center	-	    131.0848 	   31.2474 	0.0001 	ISAS	-	-	-
+KSC	LC39A	-	LP	-	1966 Dec	*	KSC   LC39A	Launch Complex 39A, NASA Kennedy Space Center, Florida	-	    -80.6041 	   28.6083 	0.0001 	NASA	-	-	-
+KSC	LC39B	-	LP	-	1966 Dec	*	KSC   LC39B	Launch Complex 39B, NASA Kennedy Space Center, Florida	-	    -80.6208 	   28.6272 	0.0001 	NASA	-	-	-
+MAHIA	LC1B	-	LP	-	2017 May	-	RLLC1	Rocket Lab Launch Complex 1B, Mahia Peninsula	Mahia Peninsula, N Island	    177.8652 	  -39.2604 	0.0001 	RLABN	-	-	-
+MARS	Pad 0B	-	LP	-	2006	*	WI    LA0B	Launch Area 0B, Mid-Atlantic Regional Spaceport, Wallops Island	-	    -75.4913 	   37.8311 	0.0001 	NASA	-	-	-
+SHAR	SLP	-	LP	-	1990	*	SHAR  SLP	GSLV pad 2, Sriharikota Range	-	     80.2305 	   13.7200 	0.0001 	ISRO	-	-	-
+TNSC	Y	-	LP	-	1992	*	TNSC  Y	Yoshinobu Launch Complex, Osaki Site, Tanegashima Space Center	-	    130.9776 	   30.4008 	0.0001 	NASDA	-	-	-
+VOST	PU1S	-	LP	-	2016	*	Vostochniy PU1S	PU1S (371SK14) Soyuz pad, Vostochniy, Svobodniy, Amurskaya Oblast', Rossiya	-	    128.3345 	   51.8840 	0.0010 	RVSN	Svobodniy	-	-
+VS	SLC4W	LC2-3	LP	-	1966 Jul 29	2015 Feb	V     SLC4W	Space Launch Complex 4-West, Vandenberg AFB	-	   -120.6158 	   34.6331 	0.0001 	USAF	-	-	-
+WEN	LC101	-	LP	-	2016	*	WEN	CZ-5 pad, Wenchang Space Center, Hainan	-	    110.9511 	   19.6143 	0.0001 	CN	-	-	-
+XSC	LC2	-	LP	-	1990	*	XSC   LC2	Launch Complex 2, Xichang Space Center	-	    102.0271 	   28.2455 	0.0001 	CN	-	-	-

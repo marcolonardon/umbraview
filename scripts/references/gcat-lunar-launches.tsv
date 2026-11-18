@@ -1,0 +1,19 @@
+# Linhas copiadas em 18/11/2026 do registro de lancamentos do GCAT (launch.tsv), sem mudar nada:
+# J. McDowell, General Catalog of Artificial Space Objects, https://planet4589.org/space/gcat (CC-BY).
+# Um lancamento a Lua de cada base de src/data/launchSites.js; o teste launchSites.test.js amarra a lista a elas.
+#Launch_Tag	Launch_JD	Launch_Date	LV_Type	Variant	Fairing	Flight_ID	Flight	Mission	FlightCode	Platform	Launch_Site	Launch_Pad	Ascent_Site	Ascent_Pad	Perigee	Apogee	Apoflag	Inc	Azimuth	Range	RangeFlag	Dest	OrbMass	OrbPay	Agency	LaunchCode	FailCode	Group	Category	LTCite	Cite	Notes
+# Updated 2026 Nov 18 0143:38
+1976-081 	2443000.13 	1976 Aug  9 1504:12	Proton-K/D-1	-	-	288-02	Luna-24	E-8-5M No. 413	-	-	NIIP-5	LC81/23	-	-	      -	 150000	 	-	   -	    -	 	-	   0.000 	   5.820 	RVSN	DS  	-	G	Sat EEO E 2	NK9810-25	NK9810-25	-
+1990-007 	2447915.99 	1990 Jan 24 1146:00	Mu-3S-II	-	-	M-3S2-5	Hiten/KM-M	MUSES-A	-	-	KASC	M1	-	-	      -	 150000	 	-	   -	    -	 	-	   0.000 	   0.722 	ISAS	DS  	-	G	Sat DSO OO	ISASNews2007.1	-	-
+1994-004 	2449378.19 	1994 Jan 25 1634	Titan II SLV	-	-	23G-11	DSPSE	DSPSE	-	-	VS	SLC4W	-	-	      -	 150000	 	-	   -	    -	 	-	   0.000 	   0.541 	AFSMC	DS  	-	G	Sat LEO O	Wire	-	-
+2003-043 	2452910.47 	2003 Sep 27 2314:46	Ariane 5G	-	-	V162 (516)	Insat 3E/e-Bird	e-Bird	-	-	CSG	ELA3	-	-	      -	 150000	 	-	   -	    -	 	-	   0.000 	   5.472 	AE	DS  	-	CO	Sat GTO SO 2	Wire	-	-
+2013-047 	2456542.64 	2013 Sep  7 0327:00	Minotaur V	-	-	1	LADEE	LADEE	-	-	MARS	Pad 0B	-	-	      -	 150000	 	-	   -	    -	 	-	   0.000 	   0.383 	OSCC	OS  	-	CG/G	Sat DSO OO	Wire	-	-
+2018-103 	2458460.27 	2018 Dec  7 1823	Chang Zheng 3B	G2	-	Y30	Chang'e-4	Chang'e-4	-	-	XSC	LC2	-	-	      -	 150000	 	-	   -	    -	 	-	   0.000 	   3.920 	CALT	DS  	-	G	Sat DSO O	nasaspaceflight.com	xinhuanet.com	-
+2022-070 	2459758.91 	2022 Jun 28 0955	Electron	L	-	27	CAPSTONE	CAPSTONE	-	-	MAHIA	LC1B	-	-	    154	    171	 	 39.1 	   -	    -	 	-	   0.000 	   0.325 	RLABN	DS  	-	C/G	Sat DSO OO	Wire	-	-
+2023-098 	2460139.88 	2023 Jul 14 0905:17	LVM3	-	-	LVM3-M4	Chandrayaan-3	Chandrayaan-3	-	-	SHAR	SLP	-	-	    170	  36500	 	 21.3 	   -	    -	 	-	   0.000 	   3.895 	ISRO	DS  	-	G	Sat GTO O	Wire	-	-
+2023-118 	2460167.47 	2023 Aug 10 2310:57	Soyuz-2-1B	Fregat	-	V 15000-003/ 122-10	Luna-25	Luna-Glob	-	-	VOST	PU1S	-	-	     50	    250	?	 51.7 	   -	    -	 	-	   0.000 	   1.800 	FKA	DS  	-	G	Sat EEO SE	nasaspaceflight.com	-	-
+2023-137 	2460194.49 	2023 Sep  6 2342:11	H-IIA 202	1	-	H-IIA-47	XRISM/SLIM	XRISM/SLIM	-	-	TNSC	Y	-	-	    566	    580	 	 31.0 	   -	    -	 	-	   0.000 	   4.102 	MHI	OS  	-	CG	Sat LEO O	www.mhi.com	-	-
+2024-006 	2460317.80 	2024 Jan  8 0718	Vulcan Centaur VC2S	-	-	V-001	Peregrine	CERT-1	-	-	CC	SLC41	-	-	      -	      -	 	-	   -	    -	 	-	   0.000 	   1.287 	ULAD	DS  	-	C	Sat EEO O	Wire	-	-
+2024-083 	2460433.89 	2024 May  3 0927:29	Chang Zheng 5	-	-	Y8	Chang'e-6	Chang'e-6	-	-	WEN	LC101	-	-	    136	    300	?	 23.4 	   -	    -	 	-	   0.000 	   8.257 	CALT	DS  	-	G	Sat DSO O	nasaspaceflight.com	xinhuanet.com	-
+2025-038 	2460733.51 	2025 Feb 27 0016:30	Falcon 9	FT5	-	444/B1083.9  F442	IM-2	IM-2/Odin/LTB/CGEO-1	-	-	KSC	LC39A	-	-	      -	      -	 	-	   -	    -	 	-	   0.000 	   2.800 	SPX	DS  	-	C	Sat EEO O	SpaceX	-	-
+2026-069 	2461132.44 	2026 Apr  1 2235:12	SLS Block 1	-	-	2	Artemis II	Integrity	-	-	KSC	LC39B	-	-	      -	      -	 	-	   -	    -	 	-	   0.000 	  25.848 	MSFC	DS  	-	G	Sat DSO E	Wire	-	-

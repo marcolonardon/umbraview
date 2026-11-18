@@ -1,4 +1,6 @@
-/* A vista do sistema. Só tokens (tokens.css): nada de #hex nem px solto aqui. */
+/* A vista do sistema. Só tokens (tokens.css): nada de #hex nem px solto aqui.
+   A vista da missão (MissionView.jsx) tem o mesmo esqueleto (a cena, a camada dos nomes, os
+   números e as notas) e usa estas mesmas classes, em vez de uma cópia delas. */
 .system-view {
   display: flex;
   flex-direction: column;
@@ -43,47 +45,7 @@
   color: var(--color-earth);
 }
 
-.system-view__controls {
-  display: flex;
-  align-items: center;
-  flex-wrap: wrap;
-  gap: var(--space-2) var(--space-3);
-}
-
-.system-view__range {
-  flex: 1;
-  min-width: var(--space-10);
-  accent-color: var(--color-accent);
-}
-
-.system-view__when {
-  color: var(--color-text);
-  font-size: var(--font-size-sm);
-  font-variant-numeric: tabular-nums;
-  white-space: nowrap;
-}
-
-.system-view__button {
-  padding: var(--space-1) var(--space-3);
-  border: 1px solid var(--color-border-control);
-  border-radius: var(--radius-sm);
-  background: none;
-  color: var(--color-text);
-  font: inherit;
-  font-size: var(--font-size-sm);
-  cursor: pointer;
-  transition: transform var(--duration-press) var(--ease-out);
-}
-
-.system-view__button:active:not(:disabled) {
-  transform: scale(0.97);
-}
-
-.system-view__button:disabled {
-  border-color: var(--color-border);
-  color: var(--color-text-muted);
-  cursor: default;
-}
+/* A linha do relógio e dos botões é da ViewClock.css: a vista da missão usa a mesma. */
 
 .system-view__facts {
   display: grid;

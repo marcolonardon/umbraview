@@ -69,6 +69,14 @@ installs everything on Windows, from scratch.
   its orbit and the direction of the Sun, with the positions, axes and libration from the engine
   (`src/engine/system.js`), not to scale, and its own clock that moves through the period without
   changing the calculation date.
+- The mission view (the "Mission" selector, above the scene; card C13): the Earth and the Moon
+  with their real sizes and the real distance between them, the Earth turning with the view's
+  clock, and 15 launch pads marked on the Earth at their real latitude and longitude
+  (`src/data/launchSites.js`, with the coordinates from GCAT). The engine puts each pad in space
+  at the clock's instant (`src/engine/earthSite.js`, checked against JPL Horizons). A launch
+  site is chosen by clicking its mark or in the list, which also turns the camera to it. It is
+  where the mission simulation will be drawn (cards C14 to C16); the path of a mission is not
+  there yet.
 - In the panel, the list of landing sites, which also chooses the site, including by keyboard
   alone (card I2): the IM-2 landing and the center of 7 of the 9 Artemis III candidate regions
   (card E16). Also in the panel, the date and time in UTC, which start at the time the page was
@@ -251,6 +259,7 @@ umbraview/
 │
 ├── docs/
 │   ├── backlog.md
+│   ├── mission-simulation-plan.md   the plan for the mission simulation (cards C13 to C16), not built yet
 │   ├── primeiros-passos.md
 │   └── uso-de-ia.md
 │
@@ -279,8 +288,11 @@ umbraview/
 │   │   ├── prepare_stars.py         generates public/data/stars/, from the HYG catalog
 │   │   ├── requirements.txt
 │   │   └── window-lengths.mjs       how long the landing windows last, to choose the minimum
-│   ├── references/                  external references for the tests of the engine and of the site list
+│   ├── references/                  external references for the tests of the engine and of the site lists
 │   │   ├── artemis-regions.geojson  the outline of the Artemis III candidate regions, from the USGS (card E16)
+│   │   ├── gcat-launch-points.tsv   the launch pads of the list of launch sites, rows copied from GCAT (card C13)
+│   │   ├── gcat-lunar-launches.tsv  one launch to the Moon from each of those pads, rows copied from GCAT
+│   │   ├── horizons-reference.mjs   generates horizonsEarthSite.json, from JPL Horizons
 │   │   ├── polar_reference.py
 │   │   ├── requirements.txt
 │   │   └── spice_reference.py
@@ -293,6 +305,8 @@ umbraview/
 │   ├── data/
 │   │   ├── about.js                 the text that explains the product: the problem, what the site does and how to start
 │   │   ├── app.js                   main screen texts
+│   │   ├── launchSites.js           the launch sites of the mission view, with the source of each one (card C13)
+│   │   ├── missionView.js           mission view texts (the Earth and the Moon to scale)
 │   │   ├── panel.js                 site panel texts (card I1)
 │   │   ├── scene.js                 3D scene texts (cards C1 to C3)
 │   │   ├── siteSky.js               ground view and timeline texts
@@ -300,10 +314,12 @@ umbraview/
 │   │   └── systemView.js            system view texts (the Earth, the Moon and the Sun)
 │   ├── engine/                      the calculation engine (card E1)
 │   │   ├── fixtures/
+│   │   │   ├── horizonsEarthSite.json  a point of the Earth's surface in space according to JPL Horizons, for the launch site test
 │   │   │   ├── polarReference.json  x/y position from pyproj, for the projection test
 │   │   │   ├── reliefSamples.json   heights read from NASA's files, for the site's terrain test
 │   │   │   └── spiceReference.json  Sun and Earth according to SPICE, for the positions test
 │   │   ├── config.js                the engine parameters, with the reason for each one
+│   │   ├── earthSite.js             a point of the Earth's surface in space at an instant: the launch site
 │   │   ├── ephemeris.js             the position of the Sun and the Earth seen from the Moon, hour by hour
 │   │   ├── geometry.js              coordinates, south polar projection and east/north/up
 │   │   ├── horizon.js               the horizon of a point, direction by direction
@@ -326,7 +342,8 @@ umbraview/
 │   │   ├── useSkyRotation.js        the rotation of the star sky for the scene, on the date
 │   │   ├── useStarCatalog.js        the stars of the scene's sky, read once per page
 │   │   ├── useSubsolarPoint.js      where the Sun is directly overhead on the date, for the scene's light
-│   │   └── useTimedNotice.js        a short notice that goes away on its own (card C3)
+│   │   ├── useTimedNotice.js        a short notice that goes away on its own (card C3)
+│   │   └── useViewClock.js          the own clock of the system view and of the mission view
 │   ├── panel/                       the site panel: the numbers and the choice of site and date (cards I1, I2 and I4)
 │   │   ├── About.css
 │   │   ├── About.jsx                the block that explains the product, at the end of the panel
@@ -349,6 +366,8 @@ umbraview/
 │   │   ├── LandingAreasLayer.jsx    the map of areas with a landing window, painted over the Moon
 │   │   ├── LunarScene.css
 │   │   ├── LunarScene.jsx           the Moon, the Sun's light for the date and the camera that rotates with the mouse
+│   │   ├── MissionView.css
+│   │   ├── MissionView.jsx          the mission view: the Earth and the Moon to scale, with the launch sites on the Earth (card C13)
 │   │   ├── MoonGlobe.jsx            the whole-Moon sphere, with its real color and terrain
 │   │   ├── NearRelief.jsx           the close-up fine terrain, only where the machine can handle it (card C6)
 │   │   ├── ReliefCap.jsx            the south pole terrain in the scene, with shadows (card C2)
@@ -360,7 +379,15 @@ umbraview/
 │   │   ├── frameBudget.js           whether the machine can handle the fine terrain: the time between frames (card C6)
 │   │   ├── EarthHaze.jsx            the Earth's blue haze in the system view: it lightens only the day side
 │   │   ├── SunBody.jsx              the 3D Sun of the system view: the disk darker at the edge, and the halo
-│   │   ├── ZoomControls.jsx         the system view camera: rotates and zooms by sliding, like the Moon scene's
+│   │   ├── ZoomControls.jsx         the camera of the system view and of the mission view: rotates, zooms by sliding and turns to a chosen point
+│   │   ├── EarthBody.jsx            the Earth of those two views: the real image, turned as it is at the instant
+│   │   ├── MoonBody.jsx             the Moon of those two views
+│   │   ├── ViewClock.css
+│   │   ├── ViewClock.jsx            the row of controls of those two views: play, the clock cursor and the hour
+│   │   ├── cssToken.js              the value of a token of tokens.css, for the colors the 3D drawing needs
+│   │   ├── missionPicking.js        the click on the mark of a launch site: which site it chooses
+│   │   ├── missionScale.js          the scale of the mission view, and where and how big the mark of a launch site is
+│   │   ├── useBodyTexture.js        the image of a body becoming a texture, for the Earth and the Moon
 │   │   ├── additiveLight.js         the blending of lights that add onto the background: the stars and the Sun's glow
 │   │   ├── earthImage.js            the Earth image for the system view, read once per page
 │   │   ├── framing.js               the camera distance for the Moon to fit in the scene, and the angles of the flight to the site

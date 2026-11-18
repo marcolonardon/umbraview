@@ -1,0 +1,43 @@
+/* A linha de controles das vistas do espaço. Só tokens (tokens.css): nada de #hex nem px solto
+   aqui. O botão é o mesmo para o de tocar e para os próprios de cada vista. */
+.view-clock {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: var(--space-2) var(--space-3);
+}
+
+.view-clock__range {
+  flex: 1;
+  min-width: var(--space-10);
+  accent-color: var(--color-accent);
+}
+
+.view-clock__when {
+  color: var(--color-text);
+  font-size: var(--font-size-sm);
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+.view-clock__button {
+  padding: var(--space-1) var(--space-3);
+  border: 1px solid var(--color-border-control);
+  border-radius: var(--radius-sm);
+  background: none;
+  color: var(--color-text);
+  font: inherit;
+  font-size: var(--font-size-sm);
+  cursor: pointer;
+  transition: transform var(--duration-press) var(--ease-out);
+}
+
+.view-clock__button:active:not(:disabled) {
+  transform: scale(0.97);
+}
+
+.view-clock__button:disabled {
+  border-color: var(--color-border);
+  color: var(--color-text-muted);
+  cursor: default;
+}

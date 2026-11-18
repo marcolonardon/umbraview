@@ -1,7 +1,7 @@
-/* A câmera da vista do sistema: gira em volta do alvo (o Sol ou a Terra) com o mouse e aproxima e afasta com a roda
- * ou a pinça, deslizando até parar, do mesmo jeito da câmera da cena da Lua (CameraRig.jsx). É o
- * CameraControls do Drei, no lugar do OrbitControls: a roda anda em passos suaves, e dá para
- * afastar até a órbita inteira ficar pequena no meio do céu.
+/* A câmera das vistas do espaço (a do sistema e a da missão): gira em volta do alvo com o mouse e
+ * aproxima e afasta com a roda ou a pinça, deslizando até parar, do mesmo jeito da câmera da cena
+ * da Lua (CameraRig.jsx). É o CameraControls do Drei, no lugar do OrbitControls: a roda anda em
+ * passos suaves, e dá para afastar até a órbita inteira ficar pequena no meio do céu.
  *
  * Só pede quadro enquanto a câmera anda (o próprio CameraControls do Drei chama o invalidate): a
  * vista parada não desenha.
@@ -23,10 +23,18 @@ const ORIGIN = Object.freeze([0, 0, 0])
    menos movimento; a câmera para onde o mouse a deixou, sem deslizar. target: o ponto para onde a
    câmera olha, [x, y, z]; pode mudar a cada quadro (a Terra andando), e a câmera vai junto.
    targetName: qual corpo é o alvo; quando ele troca, a câmera desliza até o novo alvo e vai para
-   distance, a distância de onde ele é visto. */
-export function ZoomControls({ minDistance, maxDistance, reducedMotion, target = ORIGIN, targetName = '', distance = null }) {
+   distance, a distância de onde ele é visto.
+   facing: { key, direction }, ou null. Quando a key muda, a câmera dá a volta no alvo até ficar do
+   lado para onde direction aponta (de tamanho 1, a partir do alvo), a distance dele. É o que
+   mostra a base de lançamento escolhida na lista (card C13): quem usa só o teclado não tem como
+   arrastar a Terra até ela. direction pode mudar a cada quadro (a base gira com a Terra); só a
+   troca da key move a câmera. */
+export function ZoomControls({
+  minDistance, maxDistance, reducedMotion, target = ORIGIN, targetName = '', distance = null, facing = null,
+}) {
   const controls = useRef(null)
   const lastName = useRef(targetName)
+  const lastFacing = useRef(null)
   const [x, y, z] = target
 
   useEffect(() => {
@@ -39,6 +47,18 @@ export function ZoomControls({ minDistance, maxDistance, reducedMotion, target =
     c.moveTo(x, y, z, switched && !reducedMotion)
     if (switched && distance !== null) c.dollyTo(distance, !reducedMotion)
   }, [x, y, z, targetName, distance, reducedMotion])
+
+  // depois do efeito do alvo, de propósito: quando os dois mudam juntos, este é o que vale
+  useEffect(() => {
+    const c = controls.current
+    const key = facing?.key ?? null
+    if (!c || key === lastFacing.current) return
+    lastFacing.current = key
+    if (key === null) return
+    const [dx, dy, dz] = facing.direction
+    const from = distance ?? c.distance
+    c.setLookAt(x + dx * from, y + dy * from, z + dz * from, x, y, z, !reducedMotion)
+  }, [facing, x, y, z, distance, reducedMotion])
 
   useEffect(() => {
     const c = controls.current

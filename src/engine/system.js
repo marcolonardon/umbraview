@@ -9,12 +9,14 @@
  * O "desenho" é o referencial da cena 3D da tela: y para o norte da eclíptica, e x e z no plano
  * dela (a mesma troca de eixos de src/scene/coordinates.js).
  */
-import { Body, GeoMoon, GeoVector, Illumination, MakeTime, RotateVector, Rotation_EQJ_ECL, RotationAxis, Vector } from 'astronomy-engine'
+import {
+  Body, GeoMoon, GeoVector, Illumination, MakeTime, Observer, ObserverVector, RotateVector, Rotation_EQJ_ECL, RotationAxis, Vector,
+} from 'astronomy-engine'
 
 import { moonFixedRotation } from './ephemeris.js'
 import { unitToLatLon } from './geometry.js'
 
-const AU_KM = 149597870.7
+export const AU_KM = 149597870.7
 // O mês sideral: o tempo de uma volta da Lua em relação às estrelas (NASA NSSDC, CREDITS.md).
 export const SIDEREAL_MONTH_DAYS = 27.3217
 // O ano sideral: o tempo de uma volta da Terra em volta do Sol em relação às estrelas (NASA NSSDC,
@@ -24,8 +26,10 @@ const DAY_MS = 24 * 3600e3
 
 const TO_ECLIPTIC = Rotation_EQJ_ECL()
 
-/* Do referencial equatorial (o do astronomy-engine) para o desenho. */
-function toDrawing(x, y, z, time) {
+/* Do referencial equatorial (o do astronomy-engine) para o desenho. Exportada para quem põe outra
+   coisa no mesmo desenho: o ponto do chão da Terra (earthSite.js) passa pelo mesmo giro, para a
+   base de lançamento cair em cima da Terra que a matriz daqui desenha. */
+export function toDrawing(x, y, z, time) {
   const v = RotateVector(TO_ECLIPTIC, new Vector(x, y, z, time))
   return [v.x, v.z, -v.y]
 }
@@ -58,6 +62,26 @@ function bodyMatrix(toFixed, time) {
   return [x[0], x[1], x[2], 0, z[0], z[1], z[2], 0, -y[0], -y[1], -y[2], 0, 0, 0, 0, 1]
 }
 
+/* O giro do equatorial para o fixo da Terra num instante, pelos três eixos dela: para onde apontam,
+   no espaço, o ponto do equador na longitude 0°, o da longitude 90° leste e o polo norte. Cada um
+   é a posição de um ponto do chão (ObserverVector), a mesma conta que põe a base de lançamento
+   (earthSite.js) e que bate com o JPL Horizons a 21 m.
+
+   Por que não o RotationAxis, como na Lua: para a Terra, o ângulo de rotação que ele dá, junto com
+   o polo, deixa os continentes fora do lugar. Medido em 18/11/2026 contra o ObserverVector: 0,88°
+   de longitude em fevereiro de 2025 e 0,56° em novembro de 2026 (uns 60 a 100 km no equador), e
+   134° em 01/01/2000, quando o polo quase coincide com o do referencial e a direção de onde o
+   ângulo é medido fica indefinida. Na vista do sistema não dava para ver; na da missão, a marca
+   da base cairia no mar (card C13). */
+function earthFixedRotation(time) {
+  const axis = (lat, lon) => {
+    const v = ObserverVector(time, new Observer(lat, lon, 0), false)
+    return normalize([v.x, v.y, v.z])
+  }
+  const rows = [axis(0, 0), axis(0, 90), axis(90, 0)]
+  return (x, y, z) => rows.map((row) => row[0] * x + row[1] * y + row[2] * z)
+}
+
 /* dateMs: o instante, em milissegundos UTC. Devolve:
    moonKm: a posição da Lua a partir da Terra, em km, no desenho;
    distanceKm: a distância entre os centros;
@@ -71,7 +95,7 @@ export function systemStateAt(dateMs) {
   const moon = GeoMoon(time)
   const sun = GeoVector(Body.Sun, time, true)
   const moonFixed = moonFixedRotation(RotationAxis(Body.Moon, time))
-  const earthFixed = moonFixedRotation(RotationAxis(Body.Earth, time))
+  const earthFixed = earthFixedRotation(time)
   const moonKm = toDrawing(moon.x, moon.y, moon.z, time).map((v) => v * AU_KM)
   return {
     moonKm,

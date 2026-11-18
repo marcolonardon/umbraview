@@ -1,0 +1,86 @@
+{
+  "source": "JPL Horizons API (https://ssd.jpl.nasa.gov/api/horizons.api): vetor do ponto do chão (CENTER coord@399, geodésico, altitude 0) até o centro da Terra (399), ICRF, com o sinal trocado",
+  "generatedBy": "scripts/references/horizons-reference.mjs",
+  "generatedOn": "2026-11-18",
+  "units": "km, a partir do centro da Terra, no equatorial J2000 (ICRF)",
+  "cases": [
+    {
+      "name": "Kennedy Space Center, LC-39A",
+      "lat": 28.6083,
+      "lon": -80.6041,
+      "samples": [
+        {
+          "utc": "2025-02-27T00:16:30.000Z",
+          "positionKm": [
+            952.4183243497602,
+            5523.616301346838,
+            3033.328154174335
+          ]
+        },
+        {
+          "utc": "2025-02-27T06:16:30.000Z",
+          "positionKm": [
+            -5520.061935797892,
+            921.348486159104,
+            3049.352487328406
+          ]
+        },
+        {
+          "utc": "2025-02-27T12:16:30.000Z",
+          "positionKm": [
+            -890.014442763438,
+            -5531.299462341024,
+            3038.275489409538
+          ]
+        },
+        {
+          "utc": "2025-02-27T18:16:30.000Z",
+          "positionKm": [
+            5542.642765872853,
+            -873.5316734128365,
+            3022.345278989527
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Mahia (Rocket Lab LC-1), Pad B",
+      "lat": -39.2604,
+      "lon": 177.8652,
+      "samples": [
+        {
+          "utc": "2022-06-28T09:55:00.000Z",
+          "positionKm": [
+            -2268.332771679664,
+            -4398.68543319675,
+            -4009.767603749897
+          ]
+        },
+        {
+          "utc": "2022-06-28T15:55:00.000Z",
+          "positionKm": [
+            4399.596777130977,
+            -2240.807680715029,
+            -4024.218244091972
+          ]
+        },
+        {
+          "utc": "2022-06-28T21:55:00.000Z",
+          "positionKm": [
+            2213.067361873821,
+            4417.796240509709,
+            -4019.628411746855
+          ]
+        },
+        {
+          "utc": "2022-06-29T03:55:00.000Z",
+          "positionKm": [
+            -4436.05658843575,
+            2202.646971392524,
+            -4005.215550127925
+          ]
+        }
+      ]
+    }
+  ]
+}

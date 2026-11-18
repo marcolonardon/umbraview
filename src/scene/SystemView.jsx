@@ -11,22 +11,24 @@
  */
 import { Html, Line } from '@react-three/drei'
 import { Canvas, useFrame } from '@react-three/fiber'
-import { useEffect, useMemo, useRef, useState } from 'react'
-import { Color, Matrix4, SRGBColorSpace, Texture } from 'three'
+import { useMemo, useRef, useState } from 'react'
+import { Matrix4 } from 'three'
 
 import { systemView } from '../data/systemView.js'
 import { PERIOD_DAYS } from '../engine/config.js'
 import { usePrefersReducedMotion } from '../hooks/usePrefersReducedMotion.js'
+import { useViewClock } from '../hooks/useViewClock.js'
 import {
   ECLIPTIC_SKY_MATRIX, SIDEREAL_YEAR_DAYS, earthOrbitPath, moonOrbitPath, sunPositionAu, systemStateAt,
 } from '../engine/system.js'
-import { formatPercent, formatUtc } from '../panel/format.js'
-import { earthImageOfPage } from './earthImage.js'
-import { moonImagesOfPage } from './moonImages.js'
-import { StarField } from './StarField.jsx'
-import { EarthHaze } from './EarthHaze.jsx'
+import { formatPercent } from '../panel/format.js'
+import { token } from './cssToken.js'
+import { EarthBody } from './EarthBody.jsx'
 import { sunSideStart } from './framing.js'
+import { MoonBody } from './MoonBody.jsx'
+import { StarField } from './StarField.jsx'
 import { SunBody } from './SunBody.jsx'
+import { ViewClock } from './ViewClock.jsx'
 import { ZoomControls } from './ZoomControls.jsx'
 import './SystemView.css'
 
@@ -80,51 +82,10 @@ const STAR_ZOOM_RANGE = [13, 60]
 const ORBIT_STEPS = 160
 const RING_STEPS = 96
 const SUN_INTENSITY = 2.6
-/* A imagem da Terra é escura: o mar ocupa a maior parte dela e é quase preto, e com a luz da cena a
-   Terra sumia no fundo. Dois ajustes só no desenho dela, sem mexer na luz da Lua: o lado do dia
-   reflete uma vez e meia a cor da imagem, e a imagem inteira brilha um pouco por conta própria,
-   para o lado da noite não ficar preto. O Sol continua mandando: o lado do dia é bem mais claro
-   que o da noite, e a linha entre os dois continua onde a direção do Sol a põe. */
-const EARTH_DAY_GAIN = new Color().setScalar(1.5)
-const EARTH_OWN_LIGHT = new Color().setScalar(1)
-const EARTH_OWN_LIGHT_INTENSITY = 0.2
 const AMBIENT_INTENSITY = 0.08
 
 // Tocando, o período inteiro (30 dias) passa em 24 segundos.
 const PLAY_HOURS_PER_SECOND = PERIOD_HOURS / 24
-
-function token(name) {
-  return getComputedStyle(document.documentElement).getPropertyValue(name).trim()
-}
-
-const moonColorImage = () => moonImagesOfPage().then((images) => images.color)
-
-/* A imagem de um corpo virando textura. load: a leitura da imagem, uma função de fora do
-   componente (está nas dependências do efeito). Enquanto a imagem não chega, ou se não chegar, o
-   corpo fica liso, na cor do token. A Lua usa a mesma imagem da cena principal; a Terra, o Blue
-   Marble da NASA (earthImage.js). */
-function useBodyTexture(load) {
-  const [image, setImage] = useState(null)
-  useEffect(() => {
-    let current = true
-    load().then(
-      (loaded) => current && setImage(loaded),
-      () => {},
-    )
-    return () => {
-      current = false
-    }
-  }, [load])
-  const texture = useMemo(() => {
-    if (!image) return null
-    const built = new Texture(image)
-    built.colorSpace = SRGBColorSpace
-    built.needsUpdate = true
-    return built
-  }, [image])
-  useEffect(() => () => texture?.dispose(), [texture])
-  return texture
-}
 
 // O círculo da distância média da Lua no plano da órbita da Terra: contra ele se vê a órbita da
 // Lua subir e descer uns 5°.
@@ -147,8 +108,6 @@ function Bodies({ state, orbit, earthOrbit, sunAu, dateUtc, reducedMotion, follo
     far.current = next
     onFarChange(next)
   })
-  const moonTexture = useBodyTexture(moonColorImage)
-  const earthTexture = useBodyTexture(earthImageOfPage)
   const moonPosition = state.moonKm.map((v) => v * UNITS_PER_KM)
   const moonMatrix = useMemo(
     () => new Matrix4().fromArray(state.moonMatrix).setPosition(...state.moonKm.map((v) => v * UNITS_PER_KM)),
@@ -177,47 +136,14 @@ function Bodies({ state, orbit, earthOrbit, sunAu, dateUtc, reducedMotion, follo
           não entra aqui: é a mesma direção para a Terra e para a Lua, a do Sol de verdade, e não a
           do Sol do desenho, que está perto demais e mudaria as fases. */}
       <group position={earthPosition}>
-      {/* A Terra, com o eixo dela e a imagem de verdade (o Blue Marble da NASA): com os continentes,
-          dá para ver a rotação, uma volta por dia, e qual lado está virado para a Lua. Enquanto a
-          imagem não chega, a Terra fica lisa, com uma grade por cima para a rotação aparecer. */}
-      <group matrix={earthMatrix} matrixAutoUpdate={false}>
-        <mesh>
-          <sphereGeometry args={[EARTH_RADIUS, 48, 24]} />
-          {earthTexture ? (
-            <meshStandardMaterial
-              key="textured"
-              color={EARTH_DAY_GAIN}
-              map={earthTexture}
-              emissive={EARTH_OWN_LIGHT}
-              emissiveMap={earthTexture}
-              emissiveIntensity={EARTH_OWN_LIGHT_INTENSITY}
-            />
-          ) : (
-            <meshStandardMaterial key="plain" color={token('--color-earth')} />
-          )}
-        </mesh>
-        {!earthTexture && (
-          <mesh>
-            <sphereGeometry args={[EARTH_RADIUS * 1.003, 12, 6]} />
-            <meshBasicMaterial color={token('--color-bg')} wireframe transparent opacity={0.35} />
-          </mesh>
-        )}
-        <Line points={[[0, -EARTH_RADIUS * 1.6, 0], [0, EARTH_RADIUS * 1.6, 0]]} color={token('--color-text-muted')} lineWidth={1} />
-      </group>
-      {/* fora do grupo que gira com a Terra: o véu é do lado do dia, e não dos continentes */}
-      <EarthHaze radius={EARTH_RADIUS} sunDirection={sun} color={token('--color-earth')} />
+      {/* A Terra, virada como ela está no instante, com a imagem de verdade (EarthBody.jsx). */}
+      <EarthBody radius={EARTH_RADIUS} matrix={earthMatrix} sunDirection={sun} />
       <Html position={[0, -EARTH_RADIUS * 1.9, 0]} center pointerEvents="none" zIndexRange={[1, 0]} portal={labels}>
         <span className="system-view__tag">{systemView.earth}</span>
       </Html>
 
-      {/* A Lua, virada como ela está: a mesma face para a Terra, a menos da libração. */}
-      <group matrix={moonMatrix} matrixAutoUpdate={false}>
-        <mesh>
-          <sphereGeometry args={[MOON_RADIUS, 48, 24]} />
-          <meshStandardMaterial key={moonTexture ? 'textured' : 'plain'} color={moonTexture ? '#ffffff' : token('--color-moon')} map={moonTexture} />
-        </mesh>
-        <Line points={[[0, -MOON_RADIUS * 1.7, 0], [0, MOON_RADIUS * 1.7, 0]]} color={token('--color-text-muted')} lineWidth={1} />
-      </group>
+      {/* A Lua, virada como ela está: a mesma face para a Terra, a menos da libração (MoonBody.jsx). */}
+      <MoonBody radius={MOON_RADIUS} matrix={moonMatrix} />
       <Html position={[moonPosition[0], moonPosition[1] - MOON_RADIUS * 2.2, moonPosition[2]]} center pointerEvents="none" zIndexRange={[1, 0]} portal={labels}>
         <span className="system-view__tag">{systemView.moon}</span>
       </Html>
@@ -260,8 +186,9 @@ function Bodies({ state, orbit, earthOrbit, sunAu, dateUtc, reducedMotion, follo
 /* dateUtc: a data escolhida (um Date); o relógio da vista começa nela. onDateChange: chamada com
    um Date quando a pessoa pede para o instante da vista virar a data do cálculo. */
 export function SystemView({ dateUtc, onDateChange }) {
-  const [hour, setHour] = useState(0)
-  const [playing, setPlaying] = useState(false)
+  // Tocando, o relógio da vista anda sozinho; só começa quando a pessoa aperta o botão.
+  const clock = useViewClock(PERIOD_HOURS, PLAY_HOURS_PER_SECOND)
+  const { hour } = clock
   const reducedMotion = usePrefersReducedMotion()
   const [far, setFar] = useState(false)
   const labels = useRef(null)
@@ -282,21 +209,6 @@ export function SystemView({ dateUtc, onDateChange }) {
   const earthOrbit = useMemo(() => earthOrbitPath(dateUtc.getTime(), EARTH_ORBIT_STEPS), [dateUtc])
   const sunAu = useMemo(() => sunPositionAu(dateMs), [dateMs])
 
-  // Tocando, o relógio da vista anda sozinho; só começa quando a pessoa aperta o botão.
-  useEffect(() => {
-    if (!playing) return
-    let frame
-    let last = performance.now()
-    const tick = (now) => {
-      const elapsed = (now - last) / 1000
-      last = now
-      setHour((value) => (value + elapsed * PLAY_HOURS_PER_SECOND) % PERIOD_HOURS)
-      frame = requestAnimationFrame(tick)
-    }
-    frame = requestAnimationFrame(tick)
-    return () => cancelAnimationFrame(frame)
-  }, [playing])
-
   const wholeHour = Math.floor(hour)
 
   return (
@@ -311,27 +223,9 @@ export function SystemView({ dateUtc, onDateChange }) {
         </Canvas>
         <div className="system-view__labels" ref={labels} />
       </div>
-      <div className="system-view__controls">
-        <button className="system-view__button" type="button" aria-pressed={playing} onClick={() => setPlaying((value) => !value)}>
-          {playing ? systemView.pause : systemView.play}
-        </button>
-        <input
-          className="system-view__range"
-          type="range"
-          min="0"
-          max={PERIOD_HOURS - 1}
-          step="1"
-          value={wholeHour}
-          onChange={(event) => {
-            setPlaying(false)
-            setHour(Number(event.target.value))
-          }}
-          aria-label={systemView.timeLabel}
-          aria-valuetext={formatUtc(new Date(dateMs))}
-        />
-        <span className="system-view__when">{formatUtc(new Date(dateUtc.getTime() + wholeHour * HOUR_MS))}</span>
+      <ViewClock clock={clock} startUtc={dateUtc} periodHours={PERIOD_HOURS} labels={systemView}>
         <button
-          className="system-view__button"
+          className="view-clock__button"
           type="button"
           disabled={wholeHour === 0}
           onClick={() => onDateChange(new Date(dateUtc.getTime() + wholeHour * HOUR_MS))}
@@ -339,14 +233,14 @@ export function SystemView({ dateUtc, onDateChange }) {
           {systemView.useThisTime}
         </button>
         <button
-          className="system-view__button"
+          className="view-clock__button"
           type="button"
           aria-pressed={followEarth}
           onClick={() => setFollowEarth((value) => !value)}
         >
           {systemView.followEarth}
         </button>
-      </div>
+      </ViewClock>
       <dl className="system-view__facts">
         <div>
           <dt>{systemView.distance}</dt>

@@ -13,6 +13,8 @@ import { afterEach, describe, expect, it, vi } from 'vitest'
 import App from './App.jsx'
 import { about } from './data/about.js'
 import { app } from './data/app.js'
+import { launchSites } from './data/launchSites.js'
+import { missionView } from './data/missionView.js'
 import { panel } from './data/panel.js'
 import { scene } from './data/scene.js'
 import { sites } from './data/sites.js'
@@ -37,6 +39,11 @@ vi.mock('./scene/LandingAreasLayer.jsx', () => ({ LandingAreasLayer: () => null 
 const vistaDoSistema = vi.hoisted(() => ({ props: null }))
 vi.mock('./scene/SystemView.jsx', () => ({
   SystemView: (props) => { vistaDoSistema.props = props; return <div data-testid="vista-do-sistema" /> },
+}))
+// a vista da missão também: o teste confere o que o App entrega a ela e que a base escolhida fica guardada
+const vistaDaMissao = vi.hoisted(() => ({ props: null }))
+vi.mock('./scene/MissionView.jsx', () => ({
+  MissionView: (props) => { vistaDaMissao.props = props; return <div data-testid="vista-da-missao" /> },
 }))
 
 /* A cena de verdade, com o onSelect e a data que o App entrega a ela guardados aqui: o teste
@@ -264,5 +271,40 @@ describe('App, a troca entre a Lua e a vista do sistema', () => {
     const nova = new Date('2026-12-01T00:00:00Z')
     act(() => vistaDoSistema.props.onDateChange(nova))
     expect(vistaDoSistema.props.dateUtc).toBe(nova)
+  })
+})
+
+describe('App, a vista da missão (card C13)', () => {
+  it('o seletor troca para a missão, com a mesma data e as bases da lista, e só um botão fica ligado', () => {
+    render(<App />)
+    const missao = screen.getByRole('button', { name: missionView.viewMission })
+    expect(missao).toHaveAttribute('aria-pressed', 'false')
+    expect(screen.queryByTestId('vista-da-missao')).not.toBeInTheDocument()
+
+    fireEvent.click(missao)
+    expect(missao).toHaveAttribute('aria-pressed', 'true')
+    expect(screen.getByRole('button', { name: systemView.viewMoon })).toHaveAttribute('aria-pressed', 'false')
+    expect(screen.getByRole('button', { name: systemView.viewSystem })).toHaveAttribute('aria-pressed', 'false')
+    expect(screen.getByTestId('vista-da-missao')).toBeInTheDocument()
+    expect(screen.queryByTestId('canvas')).not.toBeInTheDocument()
+    expect(vistaDaMissao.props.dateUtc).toBe(sceneProps.dateUtc)
+    expect(vistaDaMissao.props.launchSites).toBe(launchSites)
+    expect(vistaDaMissao.props.launchSiteId).toBeNull()
+  })
+
+  /* Trocar de vista desmonta a da missão. Se a escolha morasse nela, a pessoa escolheria a base,
+     iria olhar a Lua e, na volta, teria que escolher de novo. */
+  it('a base escolhida continua escolhida depois de ir a outra vista e voltar', () => {
+    render(<App />)
+    const missao = screen.getByRole('button', { name: missionView.viewMission })
+    fireEvent.click(missao)
+    act(() => vistaDaMissao.props.onLaunchSiteChange('ksc-lc39a'))
+    expect(vistaDaMissao.props.launchSiteId).toBe('ksc-lc39a')
+
+    fireEvent.click(screen.getByRole('button', { name: systemView.viewMoon }))
+    expect(screen.queryByTestId('vista-da-missao')).not.toBeInTheDocument()
+    vistaDaMissao.props = null
+    fireEvent.click(missao)
+    expect(vistaDaMissao.props.launchSiteId).toBe('ksc-lc39a')
   })
 })

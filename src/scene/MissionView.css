@@ -1,0 +1,42 @@
+/* A vista da missão. Só tokens (tokens.css): nada de #hex nem px solto aqui. O esqueleto (a cena, a
+   camada dos nomes, os números e as notas) é o da vista do sistema, com as classes dela
+   (SystemView.css); aqui fica só o que é desta vista. */
+
+/* Os três botões de câmera, juntos na linha do relógio. O ligado tem a mesma marca do seletor de
+   vista (App.css). */
+.mission-view__camera {
+  display: flex;
+  gap: var(--space-2);
+}
+
+.mission-view__camera .view-clock__button[aria-pressed='true'] {
+  background: var(--color-surface-raised);
+}
+
+/* A lista de bases: o mesmo desenho da lista de locais de pouso (SiteList.css). O navegador não
+   passa a fonte da página para o <select>. */
+.mission-view__site {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  max-width: var(--panel-width);
+  color: var(--color-text-secondary);
+  font-size: var(--font-size-sm);
+}
+
+.mission-view__select {
+  font: inherit;
+  font-size: var(--font-size-md);
+  color: var(--color-text);
+  background-color: var(--color-surface);
+  border: 1px solid var(--color-border-control);
+  border-radius: var(--radius-sm);
+  padding: var(--space-2) var(--space-3);
+}
+
+/* O nome da base escolhida, na cor da marca dela e um pouco acima, para não tampar a marca. */
+.mission-view__site-tag {
+  display: block;
+  color: var(--color-accent);
+  transform: translateY(calc(-1 * var(--space-5)));
+}

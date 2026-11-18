@@ -11,6 +11,13 @@ const utcDateTime = new Intl.DateTimeFormat('en-GB', {
   timeStyle: 'short',
 })
 
+// só a data, para o que não tem hora que importe na tela: o dia de um lançamento (card C13)
+const utcDate = new Intl.DateTimeFormat('en-GB', { timeZone: 'UTC', dateStyle: 'medium' })
+
+export function formatUtcDate(date) {
+  return utcDate.format(date)
+}
+
 export function formatDegrees(degrees) {
   return `${degrees.toFixed(1)}°`
 }
