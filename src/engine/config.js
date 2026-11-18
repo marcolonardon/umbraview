@@ -63,3 +63,50 @@ export const ORBIT = Object.freeze({
      12 horas, a 254 m. Montar a grade de 6 dias leva 2 ms. */
   gridStepS: 3600,
 })
+
+/* A missão de referência (mission.js, card C15): o caminho de uma base de lançamento até um local
+   de pouso, dentro de uma janela de pouso.
+
+   TODOS OS VALORES SÃO PROVISÓRIOS. Os quatro primeiros são os do rascunho de 17/11/2026
+   (docs/mission-simulation-plan.md) e os outros foram postos em 18/11/2026 para a conta fechar;
+   nenhum tem fonte ainda. Escolher cada um, com a fonte ou a razão escrita, é decisão do Marco e
+   do Enzo (plano, "Decisions that are not Claude's to make"). A tela tem que mostrá-los como
+   escolhas do modelo, e não como dados de uma missão que voou. */
+export const MISSION = Object.freeze({
+  // a altura da órbita de espera em volta da Terra, de onde a nave sai para a Lua
+  parkingAltitudeKm: 185,
+  /* O tempo de travessia que se procura, em dias. O lançamento é escolhido pela inclinação, e não
+     pela hora, então a travessia de cada missão sai meio dia para mais ou para menos (de 3,6 a
+     4,3 dias em 26 missões de dezembro de 2026, medido em 18/11/2026). */
+  crossingDays: 4,
+  // a altura da passagem pela Lua e da órbita circular em que a nave fica depois dela
+  lunarOrbitAltitudeKm: 100,
+  /* Quanto tempo a nave fica na órbita lunar antes de descer. A saída só pode ser num ponto certo
+     da volta (1 h 58 min cada uma), então a espera de verdade é a mais próxima deste valor. */
+  lunarOrbitStayHours: 12,
+  // o pouso é mirado tantas horas depois de a janela abrir, ou no meio dela, se ela for mais curta que o dobro
+  landingAimHours: 12,
+  /* A subida da base até a órbita de espera é desenho, e não conta: uma curva que leva este tempo
+     e anda este ângulo em volta da Terra. */
+  ascentMinutes: 10,
+  ascentArcDeg: 20,
+  /* A descida: uma elipse que sai da órbita lunar e chega a esta altura do chão meia volta
+     depois, tantos graus antes do local de pouso. Dali ao chão é desenho de novo: uma curva que
+     leva este tempo. */
+  descentLowPointKm: 15,
+  poweredDescentArcDeg: 15,
+  poweredDescentMinutes: 12,
+})
+
+/* A mira da missão: quanto falta para a conta parar de corrigir, e em quantos degraus a gravidade
+   da Lua e do Sol entra. */
+export const AIMING = Object.freeze({
+  /* A mira começa só com a Terra, onde o primeiro chute (uma elipse) é exato, e liga a Lua e o
+     Sol aos poucos: em cada degrau a resposta do anterior ainda está perto. */
+  gravitySteps: Object.freeze([0, 0.25, 0.5, 0.75, 1]),
+  // a passagem pela Lua tem que acertar a altura e o plano a menos de 1 m, e a hora a menos de 0,01 s
+  toleranceKm: 0.001,
+  toleranceS: 0.01,
+  // em 26 missões de dezembro de 2026, cada degrau fechou em 2 ou 3 correções (medido em 18/11/2026)
+  maxCorrections: 12,
+})
