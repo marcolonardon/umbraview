@@ -42,3 +42,24 @@ export const MIN_LANDING_WINDOW_HOURS = 24
    79 ms a cada troca de data; a de 365 dias, de 123 a 180 ms, e o ponto mais iluminado do mapa da
    NASA chega a 13 janelas de pouso na lista. Muda aqui, e só aqui. */
 export const PERIOD_DAYS = 30
+
+/* O propagador de órbitas (orbit.js, card C14). A prova é o orbit.test.js: a trajetória voada da
+   Artemis I, do JPL Horizons, e as órbitas que têm fórmula. As medições abaixo são de 18/11/2026,
+   no Node, no computador do Marco; mudar um número pede medir de novo. */
+export const ORBIT = Object.freeze({
+  /* O passo é esta fração do tempo que a gravidade leva para mudar o caminho ali, √(distância³/GM):
+     8 s na órbita baixa da Terra. Numa elipse da órbita baixa até a distância da Lua, 5 dias de
+     subida só com a Terra, o erro na chegada foi de 4 km com 0,05, de 215 m com 0,02, de 19 m com
+     0,01 e de 1,5 m com 0,005. O custo quase não muda (de 2893 a 3290 passos em 4 dias), porque a
+     fração só manda perto da Terra e da Lua. */
+  stepFraction: 0.01,
+  /* O teto do passo, em segundos: vale de 39 mil km da Terra em diante, quase a travessia toda.
+     Com 60, 120, 300 e 600 s, o erro na mesma elipse foi de 13, 19, 25 e 27 m, e um caminho de
+     4 dias levou 0,5, 0,3, 0,2 e 0,1 ms. Contra a Artemis I o resultado não muda nem com 1800 s.
+     120 s dá um ponto a cada 2 minutos para a linha da tela (card C16), e a conta já é rápida. */
+  maxStepS: 120,
+  /* De quanto em quanto tempo a Lua e o Sol são lidos do astronomy-engine para a grade, em
+     segundos. Com 1 hora, a Lua interpolada fica a 8 cm da lida direto; com 6 horas, a 16 m; com
+     12 horas, a 254 m. Montar a grade de 6 dias leva 2 ms. */
+  gridStepS: 3600,
+})

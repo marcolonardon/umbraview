@@ -1,7 +1,7 @@
 // @vitest-environment node
 import { describe, expect, it } from 'vitest'
 
-import { HORIZON, MIN_LANDING_WINDOW_HOURS, NEAR_LAYER_UP_TO_M, PERIOD_DAYS } from './config.js'
+import { HORIZON, MIN_LANDING_WINDOW_HOURS, NEAR_LAYER_UP_TO_M, ORBIT, PERIOD_DAYS } from './config.js'
 
 /* O config.js não tem conta, mas um número errado aqui muda o horizonte inteiro sem nenhum outro
    teste perceber: o motor roda com qualquer valor. Estes testes seguram o que o resto do motor
@@ -43,5 +43,20 @@ describe('parâmetros do motor (config.js)', () => {
     expect(PERIOD_DAYS).toBeGreaterThanOrEqual(29.53)
     // a série tem PERIOD_DAYS · 24 instantes, e o tamanho de um Float32Array não pode ser quebrado
     expect(Number.isInteger(PERIOD_DAYS)).toBe(true)
+  })
+
+  it('o passo do propagador é uma fração pequena do tempo da gravidade, com um teto', () => {
+    expect(ORBIT.stepFraction).toBeGreaterThan(0)
+    // acima de 0,05 a elipse até a Lua já erra a chegada por quilômetros (medição no config.js)
+    expect(ORBIT.stepFraction).toBeLessThanOrEqual(0.02)
+    expect(ORBIT.maxStepS).toBeGreaterThan(0)
+    expect(Object.isFrozen(ORBIT)).toBe(true)
+  })
+
+  it('a grade da Lua e do Sol é mais larga que o passo do propagador, e fina o bastante para a Lua', () => {
+    // mais fina que o passo, a grade custaria mais que perguntar direto ao astronomy-engine
+    expect(ORBIT.gridStepS).toBeGreaterThan(ORBIT.maxStepS)
+    // com 6 horas a Lua interpolada já fica a 16 m da lida direto (medição no config.js)
+    expect(ORBIT.gridStepS).toBeLessThanOrEqual(7200)
   })
 })
