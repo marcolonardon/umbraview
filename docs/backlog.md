@@ -2921,6 +2921,22 @@ landing site with the site chosen, and "Change mission" after a flight. Seen in 
 Athena, Kennedy LC-39A, then Malapert Massif, then 10 Jan 2027, then the checked window: "Ready to
 launch."; reopening the launch site step and "Continue": "Ready to launch." again. `npm run verify`
 passes, with 1004 tests.
+
+**The small map of the flight, after Marco's note on 19/11** ("it stutters during the mission, covers
+parts of the menus, and should be possible to hide").
+- **Its shape is fixed**, 4 wide by 3 high (`MAP_ASPECT`, in `src/scene/missionMap.js`), with the path
+  in the middle at the same scale. It followed the shape of the path: in a crossing nearly straight to
+  the north it grew to 200 × 490 px and covered the right side of the scene. Now 200 × 219 px with
+  the caption, at 1440 × 900, clear of the flight card and of the view selector (measured from the
+  boxes).
+- **"Hide map"**, a small button on it, hides it; "Show map" brings it back, in the same corner. The
+  choice holds for the next launches.
+- **The stutter.** The lines of the orbit and of the whole path are now made once per mission, not
+  at every frame. Measured on 19/11 in the app's browser pane, moving the track step by step: one
+  update of the view takes about 9 ms with the dev server and 6 ms with the built site, the same with
+  the map shown or hidden. So the map is not what costs; it moves at the frame rate of the whole
+  view, and on a slower machine the 3D drawing is the likely cost. Not verified: Marco's machine,
+  where he saw it.
 - Only launches toward the east half (0° to 180°) are possible: the engine always takes the plane
   that turns with the Earth. A site that only launches to the west (none of the 15, as far as we
   know; not checked) would be "Can't reach this orbit" in every window.
