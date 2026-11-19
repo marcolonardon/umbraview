@@ -2833,9 +2833,8 @@ on the launch site step, past the windows.
 ### C19 · Launch only in the directions each launch site allows
 
 **Status:** built on 19/11 in Marco's fork, born from the branch of card C18. The engine, the
-screen and the data field are done; **no launch site has a source for its range yet**, so every
-site shows "Not checked" and the missions are the same as before. Waiting for the sources and for
-Marco's check · **Depends on:** C18
+screen and the data field are done; five of the 15 launch sites have a sourced range (below), and
+the other ten show "Not checked". Waiting for Marco's check · **Depends on:** C18
 
 **What it is for.** Marco asked on 19/11 whether any launch site can be chosen for any landing
 window. In the model, yes: the engine chose the launch time by the inclination of the orbit, and
@@ -2886,10 +2885,27 @@ lançamento que servem para cada missão" (claude.ai, 19/11/2026).
 - Not verified: the muted marks on the Earth were not looked at (the pads of Kennedy sit on top of
   each other); real ranges, which have no source; a touch screen; a real screen reader.
 
+**The sources, looked up on 19/11/2026** at Marco's request. Only a document that states the range
+in degrees counts; the sentence of each one is copied to `scripts/references/launch-azimuths.tsv`,
+and `launchSites.test.js` ties the data to it.
+- Kennedy LC-39A and LC-39B and Cape Canaveral SLC-41: 37° to 112°, the Eastern Range, from the
+  *National Security Space Road Map* (NSSA, data of 1997, in a public copy). It is the newest
+  government document found that gives the numbers; the range may have changed since.
+- Wallops Pad 0B: 90° to 160°, from NASA's *Wallops Range User's Handbook*, version 4 (2024), section
+  3.1.5, which adds that wider directions are reached by turning in flight.
+- Vandenberg SLC-4W: 147° to 201°, the Western Range, from the same *Road Map*. The engine only
+  launches toward the east half, so it uses 147° to 180°.
+- Left `null`: Kourou (the Ariane 6 user's manual, issue 2, 2021, says almost all inclinations can be
+  reached, with no azimuths), Mahia (the Electron user's guide 7.0, 2022, gives inclinations of 39°
+  to 120°, not azimuths), and Baikonur, Vostochny, Xichang, Wenchang, Sriharikota, Tanegashima,
+  Kagoshima and Alcântara (only sites that gather numbers from elsewhere, with no source).
+- With the ranges, in seven windows of December 2026 to Athena (IM-2), every one of the five sites
+  reaches the orbit: Kennedy and Cape Canaveral launch at 86° to 91° (as before), Wallops at 90° to
+  92° with the orbit at 38°, and Vandenberg at 147° to 148° with the orbit at 64° (before, with no
+  range, it launched to the east, which Vandenberg does not do).
+
 **What is missing to finish the card.**
-- **The sources of the 15 ranges** (`TODO_PREENCHER` in spirit: today `null`). One public document
-  per site (the user's guide of a rocket, the range, the regulator), its line copied to
-  `scripts/references/`, and the source in `CREDITS.md`. Who looks them up is Marco's decision.
+- The ranges of the other ten sites, when a document with the numbers is found.
 - Only launches toward the east half (0° to 180°) are possible: the engine always takes the plane
   that turns with the Earth. A site that only launches to the west (none of the 15, as far as we
   know; not checked) would be "Can't reach this orbit" in every window.

@@ -111,8 +111,9 @@ installs everything on Windows, from scratch.
 - Launch directions (card C19): each launch site can carry the range of directions it allows, with
   its source (`azimuthLimits`, in `src/data/launchSites.js`). With a range, the mission launches
   only in it, at another time of day if needed, and the launch site step separates the sites that
-  cannot reach the orbit of the chosen window. No range has a source yet, so every site shows
-  "Not checked" and missions are as before.
+  cannot reach the orbit of the chosen window. Five sites have a sourced range (Kennedy, Cape
+  Canaveral, Wallops and Vandenberg; sources in `CREDITS.md`); the other ten show "Not checked" and
+  launch as before.
 - The orbit propagator of the engine (`src/engine/orbit.js`, card C14): given a position, a speed
   and an instant, where a spacecraft is later, under the gravity of the Earth, the Moon and the
   Sun, each in its real position. Checked against the flown path of Artemis I, from JPL Horizons:
