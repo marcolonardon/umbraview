@@ -13,8 +13,15 @@
   background: var(--color-surface-raised);
 }
 
-/* A lista de bases: o mesmo desenho da lista de locais de pouso (SiteList.css). O navegador não
-   passa a fonte da página para o <select>. */
+/* As duas listas, a das bases e a das janelas de pouso, lado a lado onde cabem. */
+.mission-view__choices {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-4);
+}
+
+/* Cada lista: o mesmo desenho da lista de locais de pouso (SiteList.css). O navegador não passa a
+   fonte da página para o <select>. */
 .mission-view__site {
   display: flex;
   flex-direction: column;
@@ -22,6 +29,11 @@
   max-width: var(--panel-width);
   color: var(--color-text-secondary);
   font-size: var(--font-size-sm);
+}
+
+/* A lista das janelas de pouso é mais larga: cada linha tem duas datas e a duração. */
+.mission-view__site--wide {
+  max-width: calc(var(--panel-width) * 1.5);
 }
 
 .mission-view__select {
@@ -39,4 +51,30 @@
   display: block;
   color: var(--color-accent);
   transform: translateY(calc(-1 * var(--space-5)));
+}
+
+/* O nome de cada evento da missão, na cor da linha dela e um pouco abaixo do ponto: o lançamento
+   acontece em cima da base, e o nome da base já fica acima. */
+.mission-view__event-tag {
+  display: block;
+  color: var(--color-accent);
+  transform: translateY(var(--space-5));
+  white-space: nowrap;
+}
+
+.mission-view__event-tag--raised {
+  transform: translateY(calc(-1 * var(--space-5)));
+}
+
+/* O nome da nave, ao lado do ponto dela, para não ficar em cima dos nomes dos eventos. */
+.mission-view__craft-tag {
+  display: block;
+  color: var(--color-text);
+  transform: translateX(calc(50% + var(--space-3)));
+  white-space: nowrap;
+}
+
+/* O aviso do que falta para haver missão, ou em que pé ela está. Sem texto, não ocupa lugar. */
+.mission-view__notice:empty {
+  display: none;
 }

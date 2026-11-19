@@ -294,6 +294,36 @@ describe('App, a vista da missão (card C13)', () => {
     expect(vistaDaMissao.props.dateUtc).toBe(sceneProps.dateUtc)
     expect(vistaDaMissao.props.launchSites).toBe(launchSites)
     expect(vistaDaMissao.props.launchSiteId).toBeNull()
+    // sem ponto escolhido na Lua, a vista da missão não tem local de pouso nem janelas (card C16)
+    expect(vistaDaMissao.props.landingSite).toBeNull()
+    expect(vistaDaMissao.props.skyStatus).toBe('idle')
+    expect(vistaDaMissao.props.landingWindows).toBeNull()
+    expect(vistaDaMissao.props.landingWindowStartMs).toBeNull()
+  })
+
+  /* O local de pouso da missão é o ponto escolhido na Lua, o mesmo do painel, e as janelas são as
+     do céu dele (useSiteSky): a vista da missão não faz essa conta de novo. */
+  it('a vista da missão recebe o ponto escolhido na Lua e o céu dele', () => {
+    render(<App />)
+    act(() => sceneProps.onSelect(TOP_1))
+    fireEvent.click(screen.getByRole('button', { name: missionView.viewMission }))
+    expect(vistaDaMissao.props.landingSite).toEqual(TOP_1)
+    // a conta do céu começou: o status já não é o de nada escolhido
+    expect(vistaDaMissao.props.skyStatus).not.toBe('idle')
+  })
+
+  it('a janela de pouso escolhida continua escolhida depois de ir a outra vista e voltar', () => {
+    render(<App />)
+    const missao = screen.getByRole('button', { name: missionView.viewMission })
+    fireEvent.click(missao)
+    const comeco = Date.parse('2026-12-05T00:00:00Z')
+    act(() => vistaDaMissao.props.onLandingWindowChange(comeco))
+    expect(vistaDaMissao.props.landingWindowStartMs).toBe(comeco)
+
+    fireEvent.click(screen.getByRole('button', { name: systemView.viewMoon }))
+    vistaDaMissao.props = null
+    fireEvent.click(missao)
+    expect(vistaDaMissao.props.landingWindowStartMs).toBe(comeco)
   })
 
   /* Trocar de vista desmonta a da missão. Se a escolha morasse nela, a pessoa escolheria a base,

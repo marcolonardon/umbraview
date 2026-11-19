@@ -43,11 +43,16 @@ export default function App() {
      porque é a mesma data que decide o mapa e os números do painel. */
   const [showLandingAreas, setShowLandingAreas] = useState(false)
   /* Qual vista ocupa a região da cena: 'moon', a Lua de perto; 'system', a Terra, a Lua e o Sol; ou
-     'mission', a Terra e a Lua em escala, com as bases de lançamento (card C13). */
+     'mission', a Terra e a Lua em escala, com as bases de lançamento e a missão simulada até o
+     ponto escolhido (cards C13 e C16). */
   const [view, setView] = useState('moon')
   /* A base de lançamento escolhida na vista da missão (o id dela), ou null. Fica aqui, e não na
      vista: trocar de vista desmonta a da missão, e a escolha se perderia. */
   const [launchSiteId, setLaunchSiteId] = useState(null)
+  /* A janela de pouso escolhida na vista da missão (o começo dela, em milissegundos UTC), ou null.
+     Fica aqui pelo mesmo motivo. Se a data ou o local mudam e essa janela deixa de existir, a
+     vista usa a primeira da lista (MissionView.jsx). */
+  const [landingWindowStartMs, setLandingWindowStartMs] = useState(null)
   const { status, sky } = useSiteSky(site, dateUtc)
 
   return (
@@ -94,6 +99,11 @@ export default function App() {
                 launchSites={launchSites}
                 launchSiteId={launchSiteId}
                 onLaunchSiteChange={setLaunchSiteId}
+                landingSite={site}
+                skyStatus={status}
+                landingWindows={sky?.landingWindows ?? null}
+                landingWindowStartMs={landingWindowStartMs}
+                onLandingWindowChange={setLandingWindowStartMs}
               />
             )}
           </section>
