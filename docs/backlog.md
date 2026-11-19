@@ -2959,6 +2959,13 @@ font is still Fira Sans.
   and the gauges have no transition. The first version rebuilt the path of the flown part at every
   frame, in straight pieces, and gave each gauge a transition that restarted at every frame: Marco
   saw both stuttering.
+- **"The telemetry is stuck at the start"** (Marco, 19/11). Measured along the track: in the climb,
+  drawn, the gauges show "—" for 5 seconds of screen; then, in the parking orbit, 185 km and
+  7.79 km/s for 5 more, because the orbit is a circle and they do not change. Both are true, and the
+  panel looked frozen. Now it counts down to the next event ("Next · Leaving the Earth · T− 25 min"),
+  from the times of the mission, which moves all the time. Found on the way: the events lost their
+  time when they became the path of the drawing, and `nextEvent` always gave the landing, so the
+  name in the scene was always "Landing" since card C16. Fixed: the events keep their time.
 - **On the right, the phase in capitals** and one sentence on what it is (`phaseNotes`, in
   `src/data/missionView.js`), and the buttons to play, of the speed and of the free camera.
 - The flight card is still there for the screen reader, with the same name and text; on screen only
