@@ -2906,6 +2906,21 @@ and `launchSites.test.js` ties the data to it.
 
 **What is missing to finish the card.**
 - The ranges of the other ten sites, when a document with the numbers is found.
+
+**A fault Marco found on 19/11, fixed on the same branch.** With a launch site chosen, after changing
+the landing site and the date, the site stayed chosen in the list, but the panel stopped on the
+launch site step and only moved on after choosing another site and the same one again. A reopened
+step that already has a choice had no way forward: a list does not tell when the same option is
+chosen again, a window card already checked does not either, and a click on the mark of the chosen
+pad did nothing. Now:
+- a reopened step with a choice shows "Continue", which keeps it and goes to the first step left;
+- a click on the window card already checked moves on, like choosing it;
+- a click on the mark of the chosen pad, alone, chooses it again (`readSiteClick`).
+Tests cover the orders: reopening each step, changing the date with the site chosen, changing the
+landing site with the site chosen, and "Change mission" after a flight. Seen in the browser:
+Athena, Kennedy LC-39A, then Malapert Massif, then 10 Jan 2027, then the checked window: "Ready to
+launch."; reopening the launch site step and "Continue": "Ready to launch." again. `npm run verify`
+passes, with 1004 tests.
 - Only launches toward the east half (0° to 180°) are possible: the engine always takes the plane
   that turns with the Earth. A site that only launches to the west (none of the 15, as far as we
   know; not checked) would be "Can't reach this orbit" in every window.
