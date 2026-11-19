@@ -6,7 +6,7 @@ import { sites } from '../data/sites.js'
 import { latLonToUnit, unitToPolarXY } from '../engine/geometry.js'
 import { latLonToScene } from './coordinates.js'
 import {
-  applySouthColor, globalLandingShader, globeTextureUv, globeTextureWindow, landingUniforms, setGlobalLandingMask, setLandingMask,
+  applySouthColor, bodyLandingShader, globalLandingShader, globeTextureUv, globeTextureWindow, landingUniforms, setGlobalLandingMask, setLandingMask,
   onUnitSphere, southCapUvs, southColorUv, southColorUniforms,
 } from './moonGlobe.js'
 
@@ -162,6 +162,33 @@ describe('a cor do polo sul nas malhas do relevo', () => {
     expect(landingUniforms.uGlobalLandingMask.value).toBe(mascara)
     expect(landingUniforms.uGlobalLandingStrength.value).toBe(1)
     setGlobalLandingMask(null)
+    expect(landingUniforms.uGlobalLandingStrength.value).toBe(0)
+  })
+})
+
+/* Card C18: o mapa de onde dá para pousar também na vista da missão. Lá a Lua anda e gira, e a
+   posição do ponto no mundo não é a dele na Lua: o shader lê a posição do vértice no próprio objeto,
+   que gira junto com ela. */
+describe('o mapa das áreas de pouso na Lua que anda e gira (vista da missão)', () => {
+  const fonte = () => ({
+    uniforms: {},
+    vertexShader: '#include <common>\nvoid main() {\n#include <begin_vertex>\n}',
+    fragmentShader: '#include <common>\nvoid main() {\n#include <color_fragment>\n}',
+  })
+
+  it('lê as duas máscaras pela posição do vértice na Lua, e não no mundo', () => {
+    const shader = fonte()
+    bodyLandingShader(shader)
+    expect(shader.uniforms.uLandingMask).toBe(landingUniforms.uLandingMask)
+    expect(shader.uniforms.uGlobalLandingMask).toBe(landingUniforms.uGlobalLandingMask)
+    expect(shader.vertexShader).toContain('vBodyPosition = transformed;')
+    expect(shader.vertexShader).not.toContain('modelMatrix')
+    expect(shader.fragmentShader).toContain('texture2D(uLandingMask')
+    expect(shader.fragmentShader).toContain('globalLandingAt(bodyUnit)')
+  })
+
+  it('desligado, as duas forças ficam em zero: a Lua aparece como é', () => {
+    expect(landingUniforms.uLandingStrength.value).toBe(0)
     expect(landingUniforms.uGlobalLandingStrength.value).toBe(0)
   })
 })

@@ -5,6 +5,7 @@ import { Line } from '@react-three/drei'
 
 import { useFarRelief } from '../hooks/useFarRelief.js'
 import { token } from './cssToken.js'
+import { bodyLandingShader } from './moonGlobe.js'
 import { moonImagesOfPage } from './moonImages.js'
 import { MoonSouthCap } from './MoonSouthCap.jsx'
 import { useBodyTexture } from './useBodyTexture.js'
@@ -36,7 +37,9 @@ const NO_RAYCAST = () => null
      - no polo sul, a malha do relevo e a imagem polar (MoonSouthCap.jsx), por cima da esfera:
        nas imagens de latitude e longitude o polo sai em raios;
      - uma esfera de clique, simples e que não aparece: o raio do mouse é testado contra os
-       triângulos de quem ouve o mouse a cada movimento dele, e os da Lua com relevo são muitos. */
+       triângulos de quem ouve o mouse a cada movimento dele, e os da Lua com relevo são muitos;
+     - o mapa de onde dá para pousar (card C18), no shader da esfera e da malha do polo
+       (bodyLandingShader), desligado até a vista ligar. */
 export function MoonBody({ radius, matrix, onClick, onPointerOver, onPointerOut, showAxis = true, relief = false }) {
   const farRelief = useFarRelief(relief ? undefined : NO_FAR_RELIEF)
   const texture = useBodyTexture(moonColorImage)
@@ -58,6 +61,7 @@ export function MoonBody({ radius, matrix, onClick, onPointerOver, onPointerOut,
           polygonOffset={relief}
           polygonOffsetFactor={1}
           polygonOffsetUnits={1}
+          onBeforeCompile={relief ? bodyLandingShader : undefined}
         />
       </mesh>
       {farRelief && <MoonSouthCap relief={farRelief} radius={radius} />}

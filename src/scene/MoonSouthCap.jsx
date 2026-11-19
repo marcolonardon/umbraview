@@ -26,7 +26,7 @@ import { useMemo } from 'react'
 import { BufferAttribute, BufferGeometry } from 'three'
 
 import { token } from './cssToken.js'
-import { onUnitSphere, southCapUvs } from './moonGlobe.js'
+import { bodyLandingShader, onUnitSphere, southCapUvs } from './moonGlobe.js'
 import { moonImagesOfPage } from './moonImages.js'
 import { buildReliefCap } from './reliefMesh.js'
 import { useBodyTexture } from './useBodyTexture.js'
@@ -72,7 +72,13 @@ export function MoonSouthCap({ relief, radius }) {
   return (
     <mesh geometry={geometry} scale={radius * CAP_LIFT} raycast={NO_RAYCAST}>
       {/* a key refaz o material quando a imagem chega: o three só decide ao montar o shader se ele tem imagem */}
-      <meshStandardMaterial key={south ? 'textured' : 'plain'} color={south ? WHITE : token('--color-moon')} map={south} />
+      {/* o mapa de onde dá para pousar (card C18) entra no shader, como na esfera (MoonBody.jsx) */}
+      <meshStandardMaterial
+        key={south ? 'textured' : 'plain'}
+        color={south ? WHITE : token('--color-moon')}
+        map={south}
+        onBeforeCompile={bodyLandingShader}
+      />
     </mesh>
   )
 }

@@ -208,6 +208,52 @@ ${GLOBAL_LANDING_GLSL}`,
   return material
 }
 
+/* O onBeforeCompile dos materiais da Lua da vista da missão (MoonBody.jsx e MoonSouthCap.jsx, card
+   C18): o mapa das áreas de pouso, a grade fina do polo e a da Lua inteira, com os mesmos uniformes
+   da cena principal (LandingAreasLayer.jsx liga e desliga). Lá a Lua fica parada no centro, e a
+   posição do ponto no mundo é a dele na Lua; aqui ela anda e gira, e o shader lê a posição do vértice
+   no próprio objeto (transformed), que gira junto. Com as duas forças em 0, a Lua fica como é. */
+export function bodyLandingShader(shader) {
+  Object.assign(shader.uniforms, landingUniforms)
+  shader.vertexShader = shader.vertexShader
+    .replace('#include <common>', '#include <common>\nvarying vec3 vBodyPosition;')
+    .replace('#include <begin_vertex>', '#include <begin_vertex>\nvBodyPosition = transformed;')
+  shader.fragmentShader = shader.fragmentShader
+    .replace(
+      '#include <common>',
+      `#include <common>
+uniform sampler2D uLandingMask;
+uniform vec3 uLandingFrame;
+uniform vec3 uLandingColor;
+uniform float uLandingStrength;
+uniform sampler2D uGlobalLandingMask;
+uniform float uGlobalLandingStrength;
+varying vec3 vBodyPosition;
+${GLOBAL_LANDING_GLSL}`,
+    )
+    .replace(
+      '#include <color_fragment>',
+      `#include <color_fragment>
+{
+  vec3 bodyUnit = normalize(vBodyPosition);
+  // a projeção polar de applySouthColor, em raios da Lua; no hemisfério norte ela cai fora da grade
+  float bodyK = 2.0 / max(1.0 - bodyUnit.y, 1e-4);
+  vec2 bodyPolar = vec2(bodyK * -bodyUnit.z, bodyK * bodyUnit.x);
+  vec2 landingUv = vec2(
+    (bodyPolar.x - uLandingFrame.x) / uLandingFrame.z,
+    1.0 - (uLandingFrame.y - bodyPolar.y) / uLandingFrame.z
+  );
+  float landingInside = step(0.0, landingUv.x) * step(landingUv.x, 1.0) * step(0.0, landingUv.y) * step(landingUv.y, 1.0);
+  float landing = max(
+    texture2D(uLandingMask, landingUv).r * landingInside * uLandingStrength,
+    globalLandingAt(bodyUnit)
+  );
+  diffuseColor.rgb = mix(diffuseColor.rgb, uLandingColor, ${LANDING_TINT.toFixed(2)} * landing);
+  totalEmissiveRadiance += uLandingColor * (${LANDING_GLOW.toFixed(2)} * landing);
+}`,
+    )
+}
+
 /* O onBeforeCompile do material da esfera da Lua: faz ele ler o mapa das áreas de pouso da Lua
    inteira, pela posição do vértice na cena, como as malhas do relevo. A cena entrega esta função ao
    material (MoonGlobe.jsx). */
