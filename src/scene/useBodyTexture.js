@@ -4,9 +4,10 @@ import { useEffect, useMemo, useState } from 'react'
 import { SRGBColorSpace, Texture } from 'three'
 
 /* load: a leitura da imagem, uma função de fora do componente (está nas dependências do efeito).
+   srgb: se a imagem é de cor (true, o padrão) ou de números, como um mapa de normais (false).
    Enquanto a imagem não chega, ou se não chegar, devolve null, e o corpo fica liso, na cor do
    token. */
-export function useBodyTexture(load) {
+export function useBodyTexture(load, srgb = true) {
   const [image, setImage] = useState(null)
   useEffect(() => {
     let current = true
@@ -21,10 +22,10 @@ export function useBodyTexture(load) {
   const texture = useMemo(() => {
     if (!image) return null
     const built = new Texture(image)
-    built.colorSpace = SRGBColorSpace
+    if (srgb) built.colorSpace = SRGBColorSpace
     built.needsUpdate = true
     return built
-  }, [image])
+  }, [image, srgb])
   useEffect(() => () => texture?.dispose(), [texture])
   return texture
 }

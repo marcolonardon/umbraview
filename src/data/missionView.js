@@ -65,7 +65,7 @@ export const missionView = {
   landingSitePlaceholder: 'Choose a landing site…',
   // o ponto que veio do clique na Lua, e não da lista: a opção que a lista mostra para ele
   customLandingSite: 'Your point on the Moon',
-  landingHint: 'Click a pin, or any point on the Moon.',
+  landingHint: 'Click a pin, or any point on the Moon. Drag to turn it, scroll to zoom.',
   // as listas ficam recolhidas atrás deste nome: é por elas que quem usa teclado escolhe
   chooseFromList: 'Choose from a list',
   // passo 2: quando pousar

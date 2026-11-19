@@ -37,6 +37,37 @@ export function southColorUv([x, y, z], far) {
   return [(px - far.x0) / side, 1 - (far.y0 - py) / side]
 }
 
+/* O ponto da imagem color-south.jpg de cada vértice de uma malha do polo: positions são os
+   vértices em fila (x, y, z, x, y, z...), como os do buildReliefCap (reliefMesh.js), e far é o
+   campo far do manifesto. Devolve dois números por vértice (u, v), na mesma ordem.
+   É para quem desenha a malha com um material comum, sem o shader daqui: a vista da missão, em
+   que a Lua anda e gira, e a posição do ponto no mundo não serve para achar o ponto da imagem
+   (MoonSouthCap.jsx). */
+export function southCapUvs(positions, far) {
+  const uvs = new Float32Array((positions.length / 3) * 2)
+  for (let i = 0; i < positions.length / 3; i++) {
+    const [u, v] = southColorUv([positions[3 * i], positions[3 * i + 1], positions[3 * i + 2]], far)
+    uvs[2 * i] = u
+    uvs[2 * i + 1] = v
+  }
+  return uvs
+}
+
+/* Os vértices de uma malha (x, y, z em fila) levados para o raio 1, cada um na direção em que
+   estava. Devolve outro array; o de entrada fica como estava. É para a malha do polo da vista da
+   missão (MoonSouthCap.jsx): as normais saem dos vértices com a altura de verdade, e a malha é
+   desenhada no raio da esfera, sem degrau na borda. */
+export function onUnitSphere(positions) {
+  const flat = new Float32Array(positions.length)
+  for (let i = 0; i < positions.length; i += 3) {
+    const length = Math.hypot(positions[i], positions[i + 1], positions[i + 2])
+    flat[i] = positions[i] / length
+    flat[i + 1] = positions[i + 1] / length
+    flat[i + 2] = positions[i + 2] / length
+  }
+  return flat
+}
+
 /* Os uniformes da cor polar, os mesmos objetos para todas as malhas do relevo: quando a imagem
    chega, trocar o valor aqui muda todas de uma vez. uSouthColorMix em 0 deixa a cor lisa do
    material, que é como o relevo aparece enquanto a imagem baixa (ou se ela não chegar).

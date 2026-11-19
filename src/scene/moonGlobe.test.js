@@ -7,7 +7,7 @@ import { latLonToUnit, unitToPolarXY } from '../engine/geometry.js'
 import { latLonToScene } from './coordinates.js'
 import {
   applySouthColor, globalLandingShader, globeTextureUv, globeTextureWindow, landingUniforms, setGlobalLandingMask, setLandingMask,
-  southColorUv, southColorUniforms,
+  onUnitSphere, southCapUvs, southColorUv, southColorUniforms,
 } from './moonGlobe.js'
 
 const FAR = { x0: -384960, y0: 384960, columns: 802, rows: 802, resolutionM: 960 }
@@ -64,6 +64,44 @@ describe('a cor do polo sul nas malhas do relevo', () => {
     const [u, v] = southColorUv(latLonToScene(-90, 0), FAR)
     expect(u).toBeCloseTo(0.5, 9)
     expect(v).toBeCloseTo(0.5, 9)
+  })
+
+  /* A vista da missão desenha a malha do polo com a Lua em outro lugar e virada, e por isso não
+     usa o shader da cena (que lê a posição do ponto no mundo): cada vértice leva o ponto da imagem
+     polar pronto. Sem a malha e a imagem polar, o polo sul saía em raios (o Marco viu em
+     19/11/2026): na imagem de latitude e longitude o polo é um ponto esticado numa linha inteira. */
+  it('cada vértice da malha do polo leva o ponto da imagem polar em que ele cai (southCapUvs)', () => {
+    // três vértices em fila: o polo sul, um ponto a 85°S e outro a 80°S, este acima do raio 1
+    const pontos = [latLonToScene(-90, 0), latLonToScene(-85, 30), latLonToScene(-80, -140).map((value) => value * 1.004)]
+    const uvs = southCapUvs(Float32Array.from(pontos.flat()), FAR)
+    expect(uvs).toBeInstanceOf(Float32Array)
+    expect(uvs).toHaveLength(6)
+    pontos.forEach((ponto, i) => {
+      const [u, v] = southColorUv(ponto, FAR)
+      expect(uvs[2 * i]).toBeCloseTo(u, 6)
+      expect(uvs[2 * i + 1]).toBeCloseTo(v, 6)
+    })
+    // o polo no meio da imagem, e a altura do vértice não muda o ponto dele
+    expect(uvs[0]).toBeCloseTo(0.5, 6)
+    expect(uvs[1]).toBeCloseTo(0.5, 6)
+    expect(Array.from(uvs).every((value) => value > 0 && value < 1)).toBe(true)
+  })
+
+  /* Na vista da missão a malha do polo fica no raio da esfera, e o relevo dela aparece só na luz
+     (as normais, calculadas antes, com as alturas de verdade). Com as alturas, a borda da malha
+     tinha que descer até a esfera, e essa rampa em volta do polo pegava luz: um anel a 77°S (visto
+     no navegador em 19/11/2026). A 1.700 km de raio, 8 km de altura não fazem falta no contorno. */
+  it('os vértices de uma malha levados para o raio 1, cada um na direção em que estava (onUnitSphere)', () => {
+    const pontos = Float32Array.from([0, -1.004, 0, 0.3, -0.9, 0.1, 3, 0, 4])
+    const naEsfera = onUnitSphere(pontos)
+    expect(naEsfera).toBeInstanceOf(Float32Array)
+    expect(naEsfera).not.toBe(pontos)
+    for (let i = 0; i < 9; i += 3) expect(Math.hypot(naEsfera[i], naEsfera[i + 1], naEsfera[i + 2])).toBeCloseTo(1, 6)
+    expect(Array.from(naEsfera.slice(0, 3))).toEqual([0, -1, 0])
+    expect(naEsfera[6]).toBeCloseTo(0.6, 6)
+    expect(naEsfera[8]).toBeCloseTo(0.8, 6)
+    // os de entrada ficam como estavam: é deles que saem as normais
+    expect(pontos[1]).toBeCloseTo(-1.004, 6)
   })
 
   it('o material do relevo ganha a cor polar no shader, com os mesmos uniformes para todas as malhas', () => {

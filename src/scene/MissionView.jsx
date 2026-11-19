@@ -18,7 +18,7 @@
  * lançamento ao pouso, e a Terra, a Lua e a nave são desenhadas no instante dele.
  */
 import { Html, Line } from '@react-three/drei'
-import { Canvas, useFrame } from '@react-three/fiber'
+import { Canvas, useFrame, useThree } from '@react-three/fiber'
 import { useLayoutEffect, useMemo, useRef, useState } from 'react'
 import { Matrix4 } from 'three'
 
@@ -39,8 +39,9 @@ import { MissionComplete, MissionTelemetry, MissionTrack, TRACK_STEPS } from './
 import { mapPoint, missionMap } from './missionMap.js'
 import { MissionMap } from './MissionMap.jsx'
 import {
-  craftCamera, craftViewDirection, flownPoints, landingViewDirection, launchViewDirection, missionEvents, nextEvent, pathLength,
-  segmentUnits, spacecraftAt, telemetryAt, timeAtTrack, trackLayout,
+  craftCamera, craftViewDirection, flownPoints, landingStartHeight, landingViewDirection, landingViewUp, launchViewDirection,
+  missionEvents, moonViewDirection, nextEvent,
+  orbitNormal, pathLength, segmentUnits, spacecraftAt, telemetryAt, timeAtTrack, trackLayout, watchesMoon,
 } from './missionPath.js'
 import { landingMarkerPosition, readLandingClick, readSiteClick } from './missionPicking.js'
 import {
@@ -113,15 +114,21 @@ const CRAFT_RADIUS_PER_DISTANCE = 0.005
 /* Até que distância da câmera o nome de um evento aparece, em raios da Terra: de mais longe os
    dois da Terra ficam em cima um do outro e do nome dela, e os dois da Lua, do nome da Lua. */
 const EVENT_TAG_MAX_DISTANCE = 12
-/* No passo do pouso a câmera olha o polo sul da Lua, e não o centro dela: do centro, com a câmera
-   20° fora do eixo, o polo ficava fora da tela (visto no navegador). O alvo é o ponto do polo no
-   chão, e a câmera fica a esta distância dele, em raios da Terra (o raio da Lua é 0,27): daí os
-   dez locais conhecidos, que ficam a até 6,4° do polo, cabem na altura da cena, e os dois mais
-   próximos um do outro ficam a uns 13 pixels. */
-const LANDING_VIEW = { distance: 0.15, minDistance: 0.05 }
-/* Em volta do polo, a câmera não sobe além do horizonte dele: mais que isso ela entraria na Lua.
-   É o ângulo a partir do "para cima" do desenho, que é quase o polo norte da Lua. */
-const LANDING_MIN_POLAR_ANGLE = Math.PI / 2
+/* No passo do pouso a Lua é um globo: a câmera gira em volta do centro dela, para qualquer lado, e
+   a roda vai do chão à Lua inteira. Ela começa quase em cima do polo sul (landingViewDirection),
+   à altura que a largura da cena pede (landingStartHeight). Antes a câmera girava em volta do
+   ponto do polo e não subia além do horizonte dele: só se via a Lua por baixo, e o Marco achou a
+   vista limitada (18/11/2026). O mais perto que ela chega do centro, em raios da Terra: */
+const LANDING_MIN_DISTANCE = MOON_RADIUS + 0.03
+/* Até onde a câmera chega do eixo vertical do desenho, que é quase o eixo da Lua: bem em cima
+   dele não há lado para onde girar. É o mesmo limite da cena da Lua (framing.js). */
+const POLAR_EDGE = Math.PI / 180
+/* Voando em volta da Lua, a câmera olha a Lua de um lugar parado (moonViewDirection), a estas
+   distâncias do centro dela, em raios da Terra: na órbita lunar, com a órbita inteira na tela; na
+   descida e no pouso, mais perto, com a Lua inteira cabendo na altura da cena (de 0,8 ela passava
+   da borda de cima). */
+const MOON_ORBIT_DISTANCE = 1.3
+const MOON_LANDING_DISTANCE = 0.95
 // o ponto da nave durante o voo, em vezes o tamanho de base: é o que o olho tem que achar primeiro
 const CRAFT_SIZE = 1.6
 // o tamanho de um pino e do local escolhido, em vezes o tamanho de base
@@ -275,8 +282,12 @@ function MissionBodies({
   landingSite, onPickLanding, launchKey, upcoming, knownSites, step, flown, craftTick, freeCamera,
 }) {
   const planning = step !== null
-  // no passo do pouso, a câmera da Lua olha o polo sul de perto, onde estão os locais conhecidos
+  // a largura da cena sobre a altura dela: numa cena em pé, a câmera do passo do pouso começa mais alta
+  const aspect = useThree((three) => three.size.width / three.size.height)
+  // no passo do pouso, a câmera da Lua começa em cima do polo sul, de perto, onde estão os locais conhecidos
   const poleView = cameraView === 'moon' && step === 0
+  // voando em volta da Lua, a câmera olha a Lua de um lugar parado, e não a nave
+  const atMoon = cameraView === 'craft' && Boolean(craft) && watchesMoon(craft.phase)
   const [hoveredPad, setHoveredPad] = useState(-1)
   const moonPosition = kmToUnits(state.moonKm)
   const fromCenter = (center, [x, y, z]) =>
@@ -303,7 +314,8 @@ function MissionBodies({
      dela, o nome do evento aparece em cima da Lua, e o nome "Moon" ficava por baixo dele, os dois
      ilegíveis. De perto, quem fala é o evento; de longe, onde o nome do evento some, é a Lua. */
   const moonTag = useRef(null)
-  const eventOnMoon = upcoming?.center === 'moon'
+  // no passo do pouso também: com a Lua enchendo a cena, o nome dela aparecia cortado numa borda
+  const eventOnMoon = upcoming?.center === 'moon' || poleView
   useFrame(({ camera }) => {
     for (const mesh of markerMeshes.current) {
       if (mesh) mesh.scale.setScalar(markerScale(camera.position.distanceTo(mesh.position)))
@@ -319,7 +331,9 @@ function MissionBodies({
   })
 
   const view =
-    cameraView === 'craft' && craft
+    atMoon
+      ? { distance: craft.phase === 'lunarOrbit' ? MOON_ORBIT_DISTANCE : MOON_LANDING_DISTANCE, minDistance: CAMERA_VIEWS.moon.minDistance }
+      : cameraView === 'craft' && craft
       ? craftCamera(craftPosition, craft.center === 'moon' ? craft.position : craftPosition.map((value, k) => value - moonPosition[k]), {
           distance: CAMERA_VIEWS.craft.distance,
           near: CAMERA_VIEWS.craft.minDistance,
@@ -327,16 +341,16 @@ function MissionBodies({
           moonClearance: CAMERA_VIEWS.moon.minDistance,
         })
       : poleView
-        ? LANDING_VIEW
+        ? { distance: MOON_RADIUS + landingStartHeight(aspect), minDistance: LANDING_MIN_DISTANCE }
         : CAMERA_VIEWS[cameraView]
-  // o polo sul da Lua no chão: o alvo da câmera no passo do pouso (a coluna 1 da matriz é o polo norte)
-  const poleTarget = [1, 2, 3].map((k) => moonPosition[k - 1] - state.moonMatrix[3 + k] * MOON_RADIUS)
-  /* No passo do pouso, a câmera da Lua vai olhar o polo sul de perto (landingViewDirection). Só a
-     entrada no passo move a câmera: depois quem manda é a pessoa. */
+  /* No passo do pouso, a câmera da Lua vai para cima do polo sul, de perto (landingViewDirection).
+     Só a entrada no passo move a câmera: depois quem manda é a pessoa. */
   const moonFacing = useMemo(
     () => (step === 0 ? { key: 'landing', direction: landingViewDirection(state.moonMatrix, state.sunDirection) } : null),
     [step, state],
   )
+  // no passo do pouso o eixo de giro dos controles se deita, para o polo não ficar em cima dele
+  const landingUp = useMemo(() => landingViewUp(state.moonMatrix, state.sunDirection), [state])
   /* No passo da base, sem base escolhida, a câmera da Terra vai para o lado do dia, ao norte do
      equador, onde estão quase todas as bases (launchViewDirection). Com uma base escolhida, quem
      manda é ela (facing, mais abaixo). */
@@ -370,6 +384,26 @@ function MissionBodies({
      parada em relação à nave, e a nave, dando a volta, sumia atrás do corpo (visto no navegador:
      a tela toda de mar na órbita de espera). Com a câmera livre ela continua indo junto com a
      nave, mas quem a gira e aproxima é a pessoa. */
+  /* Em volta da Lua a câmera não acompanha a nave: põe-se uma vez na entrada da órbita lunar e
+     outra na da descida, num lugar parado, e é a nave que dá a volta. Acompanhando a nave a cada
+     passo do trilho, a câmera dava seis voltas na Lua em dez segundos, e a vista pulava (o Marco
+     viu em 18/11/2026). Entre uma e outra a pessoa gira e aproxima à vontade. */
+  const lunarOrbitLine = path?.lines.find((line) => line.key === 'lunarOrbit')
+  const lunarNormal = useMemo(() => (lunarOrbitLine ? orbitNormal(lunarOrbitLine.points) : null), [lunarOrbitLine])
+  const moonFlightStage = atMoon ? (craft.phase === 'lunarOrbit' ? 'orbit' : 'landing') : null
+  const moonFlightFacing = useMemo(() => {
+    if (!moonFlightStage || freeCamera || !lunarNormal || !landingSite) return null
+    const fromMoon = landingMarkerPosition(landingSite, state.moonMatrix)
+    const length = Math.hypot(...fromMoon)
+    const direction = moonViewDirection({
+      phase: moonFlightStage === 'orbit' ? 'lunarOrbit' : 'landing',
+      orbitNormal: lunarNormal,
+      landingDirection: fromMoon.map((value) => value / length),
+      sunDirection: state.sunDirection,
+    })
+    return { key: `${launchKey} ${moonFlightStage}`, direction }
+  }, [moonFlightStage, freeCamera, lunarNormal, landingSite, state, launchKey])
+
   const craftFacing = useMemo(() => {
     if (!craft || !craftPosition || freeCamera) return null
     const direction = craftViewDirection({
@@ -496,6 +530,7 @@ function MissionBodies({
         onPointerOut={planning ? handleSiteOut : undefined}
         // no passo do pouso a câmera olha o polo, e a linha do eixo atravessaria os pinos
         showAxis={planning && step !== 0}
+        relief
       />
       {step === 0 && <SitePins sites={knownSites} positions={pinPositions} onPick={onPickLanding} labels={labels} />}
       {landingMarker && <ScreenDot position={landingMarker} color="--color-accent" size={SELECTED_PIN_SIZE} rimmed />}
@@ -536,12 +571,15 @@ function MissionBodies({
         minDistance={view.minDistance}
         maxDistance={MAX_DISTANCE}
         reducedMotion={reducedMotion}
-        target={poleView ? poleTarget : cameraView === 'moon' ? moonPosition : cameraView === 'craft' && craftPosition ? craftPosition : ORIGIN}
-        // o polo e a Lua inteira são dois alvos: trocar de um para o outro desliza
-        targetName={poleView ? 'pole' : cameraView}
+        target={cameraView === 'moon' || atMoon ? moonPosition : cameraView === 'craft' && craftPosition ? craftPosition : ORIGIN}
+        // a vista do polo, a Lua inteira e a Lua do voo são alvos diferentes: trocar de um para o outro desliza
+        targetName={poleView ? 'pole' : atMoon ? 'craft-moon' : cameraView}
         distance={view.distance}
-        facing={cameraView === 'craft' ? craftFacing : cameraView === 'moon' ? moonFacing : (facing ?? padsFacing)}
-        minPolarAngle={poleView ? LANDING_MIN_POLAR_ANGLE : 0}
+        facing={atMoon ? moonFlightFacing : cameraView === 'craft' ? craftFacing : cameraView === 'moon' ? moonFacing : (facing ?? padsFacing)}
+        minPolarAngle={poleView ? POLAR_EDGE : 0}
+        maxPolarAngle={poleView ? Math.PI - POLAR_EDGE : Math.PI}
+        surfaceRadius={poleView ? MOON_RADIUS : null}
+        up={poleView ? landingUp : undefined}
       />
     </>
   )

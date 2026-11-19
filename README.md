@@ -86,15 +86,16 @@ installs everything on Windows, from scratch.
 - Mission control, over that scene (card C17, in progress): in the Mission view the scene takes
   the whole width, and the site panel leaves the page. Three labels, one per step, and one card
   with only the open step: where to land (a pin of a known site on the Moon, or any other point of
-  it, with a click), when to land (one card per landing window of that site, and the date they are searched from) and where to launch
+  it, with a click; the Moon turns like a globe and has its relief, with the mesh of the south
+  pole of the main scene), when to land (one card per landing window of that site, and the date they are searched from) and where to launch
   from (a click on the mark of a pad on the Earth). The camera goes by itself to the south pole
   of the Moon or to the Earth, where one chooses, and the lists stay folded in the card, for the
   keyboard. With the three done, a Launch button plays the mission from the pad. In
   flight there is one track for time, from the Earth to the Moon, with a piece for each of the
   six phases; a card with the mission time, the height and the speed of the spacecraft, taken
   from the computed path; the flown part of the line drawn stronger than the rest; a camera
-  that places itself in each phase, with the Earth behind the spacecraft and then the Moon ahead
-  of it, and a "Free camera" button that lets go of it; a small map of the whole path, to scale,
+  that places itself in each phase, with the Earth behind the spacecraft, then the Moon ahead
+  of it and, around the Moon, still while the spacecraft goes around, and a "Free camera" button that lets go of it; a small map of the whole path, to scale,
   in a corner; and, at the landing, a summary with the total time and the sum of the three
   burns. On a narrow screen the track takes a line of its own and the badge and the summary go
   under the scene; the keyboard focus follows the steps instead of being lost; and a screen
@@ -414,6 +415,7 @@ umbraview/
 │   │   ├── MissionView.css
 │   │   ├── MissionView.jsx          the mission view: the Earth and the Moon to scale, with the launch sites on the Earth (card C13)
 │   │   ├── MoonGlobe.jsx            the whole-Moon sphere, with its real color and terrain
+│   │   ├── MoonSouthCap.jsx         the south pole of the Moon in the mission view: the relief mesh of the pole with the polar color image (card C17)
 │   │   ├── NearRelief.jsx           the close-up fine terrain, only where the machine can handle it (card C6)
 │   │   ├── ReliefCap.jsx            the south pole terrain in the scene, with shadows (card C2)
 │   │   ├── SiteMarker.jsx           the marker of the chosen site (card C3)

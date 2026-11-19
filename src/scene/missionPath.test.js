@@ -5,8 +5,9 @@ import { EARTH_EQUATORIAL_RADIUS_KM } from '../engine/earthSite.js'
 import { computeMission } from '../engine/mission.js'
 import { systemStateAt } from '../engine/system.js'
 import {
-  craftCamera, craftViewDirection, flownPoints, landingViewDirection, launchViewDirection, missionEvents, nextEvent, pathLength,
-  segmentUnits, spacecraftAt, telemetryAt, timeAtTrack, trackAtTime, trackLayout,
+  craftCamera, craftViewDirection, flownPoints, landingStartHeight, landingViewDirection, landingViewUp, launchViewDirection,
+  missionEvents, moonViewDirection, nextEvent,
+  orbitNormal, pathLength, segmentUnits, spacecraftAt, telemetryAt, timeAtTrack, trackAtTime, trackLayout, watchesMoon,
 } from './missionPath.js'
 
 /* Dois trechos de mentira, com números fáceis: um contado da Terra, de 0 a 10 s, e um contado da
@@ -158,22 +159,150 @@ describe('até onde a câmera chega perto da nave (craftCamera)', () => {
 
 /* No passo do pouso a câmera olha o polo sul da Lua de perto: os dez locais conhecidos ficam a até
    6,4° dele (src/data/sites.js). Da vista de sempre, de lado, eles se amontoam na borda de baixo.
-   A câmera não fica bem em cima do polo: os controles giram em volta do eixo vertical do desenho,
-   que é quase o eixo da Lua, e bem em cima dele arrastar o mouse só faria a vista rodar. */
+   A câmera gira em volta do centro da Lua, como um globo, e o que fica no meio da tela é o ponto
+   embaixo dela: por isso ela fica quase em cima do polo, a 3°, com os locais em volta do meio. Só
+   não fica bem em cima: os controles giram em volta do eixo vertical do desenho, que é quase o
+   eixo da Lua, e em cima dele não há lado para onde girar. */
 describe('de onde a câmera olha a Lua no passo do pouso (landingViewDirection)', () => {
   const GRAU = 180 / Math.PI
   const dot = (a, b) => a[0] * b[0] + a[1] * b[1] + a[2] * b[2]
   const angulo = (a, b) => Math.acos(Math.max(-1, Math.min(1, dot(a, b)))) * GRAU
 
-  it.each([Date.UTC(2026, 10, 19), Date.UTC(2026, 11, 3), Date.UTC(2027, 1, 14)])('fica a 20° do polo sul, do lado do Sol (%i)', (dateMs) => {
+  it.each([Date.UTC(2026, 10, 19), Date.UTC(2026, 11, 3), Date.UTC(2027, 1, 14)])('fica a 3° do polo sul, do lado do Sol (%i)', (dateMs) => {
     const { moonMatrix, sunDirection } = systemStateAt(dateMs)
     // a coluna 1 da matriz do system.js é o polo norte do corpo
     const poloSul = [-moonMatrix[4], -moonMatrix[5], -moonMatrix[6]]
     const direcao = landingViewDirection(moonMatrix, sunDirection)
     expect(Math.hypot(...direcao)).toBeCloseTo(1, 9)
-    expect(angulo(direcao, poloSul)).toBeCloseTo(20, 6)
+    expect(angulo(direcao, poloSul)).toBeCloseTo(3, 6)
     // inclinada para o lado iluminado: mais virada para o Sol que o próprio polo
-    expect(dot(direcao, sunDirection)).toBeGreaterThan(dot(poloSul, sunDirection) + 0.3)
+    expect(dot(direcao, sunDirection)).toBeGreaterThan(dot(poloSul, sunDirection) + 0.04)
+  })
+})
+
+/* Os controles giram a câmera em volta de um eixo, o "para cima" deles, e em cima desse eixo não
+   há lado para onde girar: arrastar para o lado só roda a vista. No desenho esse eixo é quase o
+   eixo da Lua, e os locais de pouso ficam todos em volta do polo: no passo do pouso a pessoa
+   ficava o tempo todo no pior lugar (visto no navegador em 18/11/2026: um arrasto curto para o
+   lado dava meia volta em torno do polo). Nesse passo o eixo dos controles se deita. */
+describe('o "para cima" dos controles no passo do pouso (landingViewUp)', () => {
+  const dot = (a, b) => a[0] * b[0] + a[1] * b[1] + a[2] * b[2]
+
+  it.each([Date.UTC(2026, 10, 19), Date.UTC(2026, 11, 3), Date.UTC(2027, 1, 14)])('fica deitado no equador da Lua, do lado do Sol (%i)', (dateMs) => {
+    const { moonMatrix, sunDirection } = systemStateAt(dateMs)
+    const poloNorte = [moonMatrix[4], moonMatrix[5], moonMatrix[6]]
+    const cima = landingViewUp(moonMatrix, sunDirection)
+    expect(Math.hypot(...cima)).toBeCloseTo(1, 9)
+    // a 90° do eixo da Lua: o polo sul fica no "equador" dos controles, o mais longe do eixo deles
+    expect(dot(cima, poloNorte)).toBeCloseTo(0, 9)
+    // para o lado do Sol: na tela, a luz vem de cima
+    expect(dot(cima, sunDirection)).toBeGreaterThan(0.9)
+  })
+
+  it('com o Sol bem em cima do polo, não há lado do Sol: usa outro eixo do equador, sem quebrar', () => {
+    const { moonMatrix } = systemStateAt(Date.UTC(2026, 10, 19))
+    const poloNorte = [moonMatrix[4], moonMatrix[5], moonMatrix[6]]
+    const cima = landingViewUp(moonMatrix, poloNorte)
+    expect(cima.every(Number.isFinite)).toBe(true)
+    expect(Math.hypot(...cima)).toBeCloseTo(1, 9)
+    expect(dot(cima, poloNorte)).toBeCloseTo(0, 9)
+  })
+})
+
+/* A que altura do chão a câmera começa no passo do pouso. Numa cena larga, os dez locais, que
+   ficam a até 6,4° do polo, cabem na altura dela. Numa cena em pé, de celular, o que aperta é a
+   largura: da mesma altura os locais iam para fora das bordas e para baixo do cartão (visto no
+   navegador em 18/11/2026). */
+describe('a altura de onde a câmera começa no passo do pouso (landingStartHeight)', () => {
+  const RAIO_DA_LUA = 1737.4 / 6378.137
+  const MEIO_CAMPO = Math.tan((17.5 * Math.PI) / 180)
+  // onde fica, na largura da cena, um local a 6,4° do polo: 0 é o meio, 1 é a borda
+  const naLargura = (aspect) => (RAIO_DA_LUA * Math.sin((6.4 * Math.PI) / 180)) / (landingStartHeight(aspect) * MEIO_CAMPO * aspect)
+
+  it('numa cena larga é a de sempre', () => {
+    expect(landingStartHeight(2.4)).toBeCloseTo(0.17, 9)
+    expect(landingStartHeight(1.6)).toBeCloseTo(0.17, 9)
+  })
+
+  it('numa cena em pé a câmera começa mais alta, e os locais ficam longe das bordas dos lados', () => {
+    expect(landingStartHeight(0.66)).toBeGreaterThan(0.35)
+    for (const aspect of [1.2, 0.9, 0.66, 0.5]) expect(naLargura(aspect)).toBeLessThan(0.4)
+  })
+})
+
+/* Em volta da Lua a câmera não acompanha a nave (o Marco viu a vista pulando, em 18/11/2026): a
+   órbita lunar são seis voltas em dez segundos de tela, e a câmera, que se punha do lado de fora
+   da Lua em cima da nave a cada passo do trilho, dava as seis voltas junto. Ela passa a olhar a
+   Lua de um lugar parado, e quem dá a volta é a nave. */
+describe('voando em volta da Lua, a câmera olha a Lua de um lugar parado', () => {
+  const GRAU = 180 / Math.PI
+  const dot = (a, b) => a[0] * b[0] + a[1] * b[1] + a[2] * b[2]
+  const angulo = (a, b) => Math.acos(Math.max(-1, Math.min(1, dot(a, b)))) * GRAU
+
+  it('são as três fases em volta da Lua; nas outras a câmera acompanha a nave', () => {
+    expect(['lunarOrbit', 'descent', 'landing'].map(watchesMoon)).toEqual([true, true, true])
+    expect(['ascent', 'parking', 'crossing'].map(watchesMoon)).toEqual([false, false, false])
+  })
+
+  it('o plano de uma órbita sai dos pontos dela: a normal, de tamanho 1 (orbitNormal)', () => {
+    // um círculo no plano xy, em oito pontos em fila
+    const circulo = Array.from({ length: 8 }, (_, i) => [Math.cos(i * 0.7), Math.sin(i * 0.7), 0]).flat()
+    const normal = orbitNormal(circulo)
+    expect(Math.abs(normal[2])).toBeCloseTo(1, 9)
+    expect(Math.hypot(...normal)).toBeCloseTo(1, 9)
+  })
+
+  it('na missão de verdade, a normal é perpendicular a todos os pontos da órbita lunar', () => {
+    const orbita = MISSAO.segments.find((segment) => segment.phase === 'lunarOrbit')
+    const pontos = Array.from(orbita.positionsKm)
+    const normal = orbitNormal(pontos)
+    for (let i = 0; i < pontos.length; i += 3) {
+      const raio = Math.hypot(pontos[i], pontos[i + 1], pontos[i + 2])
+      expect(Math.abs(dot(normal, pontos.slice(i, i + 3))) / raio).toBeLessThan(0.01)
+    }
+  })
+
+  const sol = [1, 0, 0]
+  const normalDaOrbita = [0, 0, -1]
+  const pouso = [0, -1, 0]
+  const vista = (phase, extra = {}) =>
+    moonViewDirection({ phase, orbitNormal: normalDaOrbita, landingDirection: pouso, sunDirection: sol, ...extra })
+
+  /* A órbita lunar fica a 100 km do chão: o anel dela é só 6% maior que a Lua. Olhando quase de
+     frente para o plano dela, o anel aparece inteiro, por fora da borda da Lua, e a nave não some
+     atrás dela; a 50°, que foi a primeira tentativa, metade do anel ficava escondida (visto no
+     navegador em 18/11/2026). A 12°, o anel achatado ainda tem 1,03 raio no lado mais curto. */
+  it('na órbita lunar fica a 12° da normal do plano dela, para o lado do Sol: o anel aparece inteiro', () => {
+    const direcao = vista('lunarOrbit')
+    expect(Math.hypot(...direcao)).toBeCloseTo(1, 9)
+    expect(angulo(direcao, normalDaOrbita)).toBeCloseTo(12, 6)
+    expect(dot(direcao, sol)).toBeGreaterThan(0)
+    // o lado mais curto do anel de uma órbita a 100 km, em raios da Lua: ainda por fora da borda
+    expect((1837.4 / 1737.4) * Math.cos((angulo(direcao, normalDaOrbita) * Math.PI) / 180)).toBeGreaterThan(1.02)
+  })
+
+  it('das duas faces do plano da órbita, escolhe a que está virada para o Sol', () => {
+    const quaseNoSol = [0.6, 0, 0.8]
+    const direcao = vista('lunarOrbit', { sunDirection: quaseNoSol })
+    // a normal dada aponta para longe do Sol: a câmera fica do outro lado do plano
+    expect(angulo(direcao, [0, 0, 1])).toBeCloseTo(12, 6)
+    expect(dot(direcao, quaseNoSol)).toBeGreaterThan(0)
+  })
+
+  it('na descida e no pouso fica a 25° do local de pouso, do lado do Sol', () => {
+    for (const phase of ['descent', 'landing']) {
+      const direcao = vista(phase)
+      expect(Math.hypot(...direcao)).toBeCloseTo(1, 9)
+      expect(angulo(direcao, pouso)).toBeCloseTo(25, 6)
+      expect(dot(direcao, sol)).toBeGreaterThan(0.4)
+    }
+  })
+
+  it('com o Sol bem em cima do local, não há lado para inclinar: fica em cima dele, sem quebrar', () => {
+    const direcao = vista('landing', { sunDirection: pouso })
+    expect(direcao.every(Number.isFinite)).toBe(true)
+    expect(Math.hypot(...direcao)).toBeCloseTo(1, 9)
+    expect(angulo(direcao, pouso)).toBeLessThan(26)
   })
 })
 

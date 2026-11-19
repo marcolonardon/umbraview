@@ -98,25 +98,116 @@ export function craftCamera(fromEarth, fromMoon, { distance, near, earthClearanc
   return { distance: Math.max(distance, minDistance), minDistance }
 }
 
-// quanto a câmera do passo do pouso fica inclinada em relação ao polo sul da Lua
-const LANDING_VIEW_TILT = (20 * Math.PI) / 180
+const DEG = Math.PI / 180
+
+/* Uma direção inclinada para o lado de outra: base, virada angle radianos para o lado de toward.
+   As duas de tamanho 1; devolve de tamanho 1. Se toward é a própria base (ou a oposta), não há
+   lado para onde inclinar, e fica a base. */
+function tiltToward(base, toward, angle) {
+  const along = toward[0] * base[0] + toward[1] * base[1] + toward[2] * base[2]
+  // a parte de toward que fica de lado em relação à base
+  const side = toward.map((value, k) => value - along * base[k])
+  const length = Math.hypot(...side)
+  if (length < 1e-6) return [...base]
+  const cos = Math.cos(angle)
+  const sin = Math.sin(angle)
+  return base.map((value, k) => value * cos + (side[k] / length) * sin)
+}
+
+// quanto a câmera do passo do pouso fica fora do eixo da Lua, sobre o polo sul
+const LANDING_VIEW_TILT = 3 * DEG
 
 /* De onde a câmera olha a Lua no passo do pouso: a direção, de tamanho 1, a partir do centro da
    Lua. moonMatrix: a orientação da Lua (system.js; a coluna 1 é o polo norte). sunDirection: a
    direção do Sol, de tamanho 1.
-   Os locais de pouso conhecidos ficam todos perto do polo sul, e é para lá que a câmera olha. Ela
-   fica LANDING_VIEW_TILT fora do eixo, para o lado do Sol: bem em cima do polo, que é quase o
-   eixo vertical do desenho, arrastar o mouse só faria a vista rodar; e do lado do Sol o chão do
-   polo aparece iluminado. */
+   Os locais de pouso conhecidos ficam todos perto do polo sul. A câmera gira em volta do centro
+   da Lua, como um globo, e o que fica no meio da tela é o ponto embaixo dela: por isso ela fica
+   quase em cima do polo, com os locais em volta do meio. Só não fica bem em cima: os controles
+   giram em volta do eixo vertical do desenho, que é quase o eixo da Lua, e em cima dele não há
+   lado para onde girar. Fica do lado do Sol, de onde o chão do polo aparece iluminado. */
 export function landingViewDirection(moonMatrix, sunDirection) {
   const south = [-moonMatrix[4], -moonMatrix[5], -moonMatrix[6]]
-  const along = sunDirection[0] * south[0] + sunDirection[1] * south[1] + sunDirection[2] * south[2]
-  // a parte da direção do Sol que fica de lado em relação ao eixo da Lua
-  const side = sunDirection.map((value, k) => value - along * south[k])
-  const length = Math.hypot(...side)
-  const cos = Math.cos(LANDING_VIEW_TILT)
-  const sin = Math.sin(LANDING_VIEW_TILT)
-  return south.map((value, k) => value * cos + (side[k] / length) * sin)
+  return tiltToward(south, sunDirection, LANDING_VIEW_TILT)
+}
+
+// a altura de onde a câmera começa no passo do pouso numa cena larga, em raios da Terra
+const LANDING_START_HEIGHT = 0.17
+// a cena mais estreita em que essa altura ainda serve, em largura sobre altura
+const LANDING_WIDE_ASPECT = 1.6
+
+/* A que altura do chão da Lua a câmera começa no passo do pouso, em raios da Terra (o raio da Lua
+   é 0,27). aspect: a largura da cena sobre a altura dela.
+   Numa cena larga, os dez locais conhecidos, que ficam a até 6,4° do polo, cabem na altura dela.
+   Numa cena em pé, de celular, o que aperta é a largura: a câmera sobe na proporção em que a cena
+   estreita, e os locais ficam à mesma distância das bordas dos lados. */
+export function landingStartHeight(aspect) {
+  return LANDING_START_HEIGHT * Math.max(1, LANDING_WIDE_ASPECT / aspect)
+}
+
+/* O "para cima" dos controles da câmera no passo do pouso: uma direção de tamanho 1, deitada no
+   equador da Lua, para o lado do Sol. moonMatrix e sunDirection: como em landingViewDirection.
+   Os controles giram a câmera em volta do "para cima" deles, e bem em cima desse eixo não há lado
+   para onde girar: arrastar para o lado só roda a vista. No desenho ele é o norte da eclíptica,
+   quase o eixo da Lua, e os locais de pouso ficam em volta do polo: a pessoa ficava o tempo todo
+   no pior lugar. Deitado, o eixo fica a 90° do polo, e em volta do polo o arrasto anda para os
+   dois lados como num globo. Para o lado do Sol, a luz vem de cima na tela. */
+export function landingViewUp(moonMatrix, sunDirection) {
+  const north = [moonMatrix[4], moonMatrix[5], moonMatrix[6]]
+  const along = sunDirection[0] * north[0] + sunDirection[1] * north[1] + sunDirection[2] * north[2]
+  // a parte da direção do Sol que fica no plano do equador da Lua
+  const equator = sunDirection.map((value, k) => value - along * north[k])
+  const length = Math.hypot(...equator)
+  // com o Sol em cima do polo não há lado do Sol: serve qualquer eixo do equador (a coluna 0 da matriz)
+  if (length < 1e-6) return [moonMatrix[0], moonMatrix[1], moonMatrix[2]]
+  return equator.map((value) => value / length)
+}
+
+/* Em volta da Lua a câmera não acompanha a nave: olha a Lua de um lugar parado, e quem dá a volta
+   é a nave. A órbita lunar são seis voltas em dez segundos de tela; a câmera, que se punha em cima
+   da nave a cada passo do trilho, dava as seis voltas junto, e a vista pulava (o Marco viu em
+   18/11/2026). */
+const MOON_PHASES = new Set(['lunarOrbit', 'descent', 'landing'])
+
+// se nesta fase a câmera olha a Lua de um lugar parado (true) ou acompanha a nave (false)
+export function watchesMoon(phase) {
+  return MOON_PHASES.has(phase)
+}
+
+/* A normal do plano de uma órbita, de tamanho 1, a partir dos pontos dela em fila (x, y, z, x, y,
+   z...), contados do centro do corpo. É a soma dos produtos vetoriais de cada ponto com o
+   seguinte: não depende de quantos pontos há por volta nem de quantas voltas. */
+export function orbitNormal(points) {
+  const sum = [0, 0, 0]
+  for (let i = 3; i < points.length; i += 3) {
+    const [ax, ay, az] = [points[i - 3], points[i - 2], points[i - 1]]
+    const [bx, by, bz] = [points[i], points[i + 1], points[i + 2]]
+    sum[0] += ay * bz - az * by
+    sum[1] += az * bx - ax * bz
+    sum[2] += ax * by - ay * bx
+  }
+  const length = Math.hypot(...sum)
+  return sum.map((value) => value / length)
+}
+
+/* Quanto a câmera fica fora da normal do plano da órbita lunar. Pouco: a órbita fica a 100 km do
+   chão, e o anel dela é só 6% maior que a Lua. Quase de frente para o plano, o anel aparece
+   inteiro, por fora da borda da Lua, e a nave não some atrás dela. */
+const ORBIT_VIEW_TILT = 12 * DEG
+// quanto a câmera da descida e do pouso fica fora da vertical do local de pouso
+const LANDING_FLIGHT_TILT = 25 * DEG
+
+/* De onde a câmera olha a Lua numa fase em volta dela (watchesMoon): a direção, de tamanho 1, a
+   partir do centro da Lua. orbitNormal: a normal do plano da órbita lunar (a função de cima).
+   landingDirection: o local de pouso a partir do centro da Lua, de tamanho 1. sunDirection: a
+   direção do Sol, de tamanho 1.
+   Na órbita lunar: quase de frente para o plano da órbita, da face dele virada para o Sol, um
+   pouco inclinada para o lado iluminado. Na descida e no pouso: de cima do local de pouso, inclinada para o Sol.
+   Não recebe a posição da nave, de propósito: é isso que deixa a vista parada. */
+export function moonViewDirection({ phase, orbitNormal: normal, landingDirection, sunDirection }) {
+  if (phase !== 'lunarOrbit') return tiltToward(landingDirection, sunDirection, LANDING_FLIGHT_TILT)
+  const toSun = normal[0] * sunDirection[0] + normal[1] * sunDirection[1] + normal[2] * sunDirection[2]
+  const lit = toSun < 0 ? normal.map((value) => -value) : normal
+  return tiltToward(lit, sunDirection, ORBIT_VIEW_TILT)
 }
 
 // a que latitude da Terra a câmera do passo da base olha: perto da do meio das bases (28,6° N)
@@ -225,9 +316,9 @@ export function nextEvent(events, dateMs) {
    phaseProgress: quanto da fase já passou, de 0 a 1.
    Perto da Terra, e na primeira metade da travessia, a câmera fica para fora da Terra: a Terra
    aparece atrás da nave, ficando para trás. Da metade da travessia em diante, e na Lua, ela fica
-   na direção da Lua para a nave: na travessia, isso é atrás da nave, com a Lua à frente; em
-   volta da Lua, é do lado de fora dela. Sem isto a câmera ficava parada em relação à nave, e a
-   nave sumia atrás do corpo ao dar a volta nele. */
+   na direção da Lua para a nave: na travessia, isso é atrás da nave, com a Lua à frente. Sem
+   isto a câmera ficava parada em relação à nave, e a nave sumia atrás da Terra ao dar a volta
+   nela. Em volta da Lua a câmera não acompanha a nave (watchesMoon e moonViewDirection). */
 export function craftViewDirection({ phase, fromEarth, fromMoon, phaseProgress }) {
   const nearEarth = phase === 'ascent' || phase === 'parking' || (phase === 'crossing' && phaseProgress < 0.5)
   const from = nearEarth ? fromEarth : fromMoon

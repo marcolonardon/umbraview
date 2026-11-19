@@ -2644,6 +2644,121 @@ with the pane in view:
 - Not verified: typing a date key by key in a real browser (the pane sets the whole value at
   once); and what was not verified in phase 5.
 
+**Two things Marco found using it, on 18/11**, after the commits above.
+- **"When the lunar orbit comes in, the view kind of jumps."** In the lunar orbit the spacecraft
+  goes around the Moon six times in ten seconds of screen, and the camera, which placed itself
+  above the spacecraft at every step of the track (phase 4), went around six times with it. Around
+  the Moon the camera no longer follows the spacecraft (`watchesMoon`, in
+  `src/scene/missionPath.js`): it looks at the Moon from a place that stays still, and it is the
+  spacecraft that goes around. It places itself twice (`moonViewDirection`): at the lunar orbit,
+  nearly facing the plane of the orbit (12° off its normal, found from the points of the orbit by
+  `orbitNormal`), on the side turned to the Sun, so that the ring of the orbit, only 6% bigger than
+  the Moon, shows whole outside the edge of the Moon; and at the descent, above the landing site,
+  25° toward the Sun, closer. Between the two, a view turned with the mouse stays as it was left.
+  The first try, at 50° from the normal, hid half of the ring behind the Moon.
+- **"The view of the Moon in the choice is kind of limited."** The camera of the landing step
+  turned around the point of the pole on the ground and did not rise above its horizon: the Moon
+  was only seen from below, and from close it was a grey blur. Now:
+  - The Moon is a globe: the camera turns around its center, to any side, and the wheel goes from
+    the ground to the whole Moon. The ground follows the mouse, with the speeds of the Moon view
+    (`rotateSpeedAt`, `azimuthSpeedAt` and `dollySpeedAt`, in `src/scene/framing.js`), through a
+    new `surfaceRadius` of `ZoomControls.jsx`.
+  - The axis the controls turn around lies down in this step (`landingViewUp`, and a new `up` of
+    `ZoomControls.jsx`). It was the north of the ecliptic, nearly the axis of the Moon, and the
+    landing sites are all around the pole: right above that axis there is no side to turn to, and
+    in the first try a short drag to the side gave half a turn around the pole (seen in the
+    browser).
+  - The Moon has relief (`relief`, in `MoonBody.jsx`): the normal map of the main scene, already
+    downloaded with the color image. The craters cast shadow with the Sun.
+  - The camera starts nearly above the pole (3° off, it was 20°), at a height that follows the
+    width of the scene (`landingStartHeight`): on a phone, from the same height as on a wide
+    screen, the pins went off the sides and under the card.
+  - The hint of the step says how: "Drag to turn it, scroll to zoom."
+  - The name "Moon" is hidden in this step: with the Moon filling the scene it showed cut at an
+    edge.
+
+**Verified for the two** on 18/11/2026, with `npm run dev` in the app's browser pane (Chromium), with
+the pane in view:
+- At 1440 × 900, in the landing step: the south pole with its craters in relief, the edge of the
+  Moon in sight at the sides and the ten pins around the middle. A drag of 150 px to the side
+  moved the pole 150 px to the side, and one of 100 px up moved it 100 px up, with no spin. The
+  wheel out showed the whole Moon.
+- In the lunar orbit, with the track taken to three places of it: the Moon in the same place of
+  the screen in the three, the ring whole around it, and the spacecraft in a different place of
+  the ring in each.
+- In the descent and at the landing: the whole Moon in the height of the scene, the landing site
+  in the lower middle with its name, clear of the summary. A view turned with the mouse was the
+  same 20 steps of the track later.
+- At 375 × 812, in the landing step: the ten pins in sight above the card, and the drag moving
+  the ground with the hand.
+- The console, on a fresh load: no error, only the usual `THREE.Clock` warning.
+- Test first: 14 tests failed before the code of the two changes, then 6 before the lying axis
+  and 2 before the height by the width of the scene; two tests of the first try (the 50°) were
+  changed to 12° before the code was.
+- `npm run verify` passes, with 940 tests in 68 files and no lint warning.
+- Not verified: **the mission playing**, which is where Marco saw the jump: the pane gives
+  still pictures, and what was checked is that the camera is asked to move twice around the Moon
+  instead of at every step. The parking orbit still has the camera following the spacecraft
+  around the Earth, less than one turn in five seconds; it was left as it was. Not verified
+  either: a touch screen, and the turn of the image when the axis lies down and stands up again
+  at the change of step.
+- Known and left, and done the next day (below): right at the pole the image of the Moon is
+  pinched (the color and the relief are maps of the whole Moon, which converge there); the main
+  scene has an image of its own for the pole, not used here.
+
+**Two more things Marco found, on 19/11**, before the two above were committed.
+- **"The texture of the south pole is broken."** It was the pinch left as known above: the color
+  and the relief of the sphere are maps in latitude and longitude, in which the pole is one point
+  stretched over a whole line, and right at the pole both came out in rays around it. The landing
+  step looks exactly there. Now the pole has a mesh of its own (`MoonSouthCap.jsx`): the relief of
+  the pole of the main scene (`far.bin`, one vertex every 1.9 km, out to 12.7° from the pole) with
+  the color image made in the projection of the pole (`color-south.jpg`).
+  - The main scene draws that mesh with a shader that reads the position of the point in the
+    world, with the Moon still at the center. Here the Moon moves and turns, so each vertex
+    carries the point of the image it falls on (`southCapUvs`, in `src/scene/moonGlobe.js`).
+  - The heights enter only in the light: the normals come from the vertices at their real height,
+    and then the vertices go to the radius of the sphere (`onUnitSphere`). With the heights, the
+    edge of the mesh had to come down to the sphere, and that ramp around the pole caught the
+    light: a ring at 77°S (seen in the browser, first try).
+  - The mesh lies over the whole sphere, 900 m above it, and not in a hole cut in the sphere as in
+    the main scene: the hole asked for another crop of the images of the sphere when the relief
+    arrived, and they were sent to the video card twice (second try).
+  - The mesh is built once per page (45 to 51 ms, measured) and kept.
+- **"Sometimes the Moon gets a bit laggy."** Not reproduced: in the app's browser pane, at
+  1440 × 900 with a canvas of 2784 × 1152, every frame took 16.7 ms on average and none over
+  20 ms, dragging the globe for 4 s, moving the mouse over it for 4 s and playing the mission
+  through the lunar orbit for 7 s; and with the mission playing, the name "Landing", which is
+  tied to the ground of the Moon, did not move on screen. Two things were changed that could
+  cause it on a slower machine, without proof that they are what Marco saw:
+  - The requests to the camera leave before the browser draws (`useLayoutEffect` in
+    `ZoomControls.jsx`). A little later, as they were, a frame could go out with the Moon in its
+    new place and the camera in the old one; in the lunar orbit the Moon moves 73 km per frame,
+    8 px on screen.
+  - The Moon with relief no longer takes the ray of the mouse: a plain sphere that is not drawn
+    does (`MoonBody.jsx`). The ray is tested against the triangles of whoever listens to the mouse
+    at every move of it: 16 thousand in the sphere with relief, 2 thousand in the plain one, and
+    the mesh of the pole, with 320 thousand, takes none.
+  What was measured and stays: opening the Mission view in the landing step takes one frame of
+  about 100 ms, the images of the Moon going to the video card (it was there before), and the
+  mesh of the pole adds one of about 50 ms.
+
+**Verified for the two more** on 19/11/2026, with `npm run dev` in the app's browser pane (Chromium),
+at 1440 × 900, with the pane in view:
+- In the landing step: the pole is a field of craters with their shadows, with no rays and no
+  ring at the edge of the mesh, the same from the start height and from close.
+- A click on a point of the Moon near the pole that is not a pin chose it ("Your point on the
+  Moon"), through the sphere of the click.
+- In flight, in the lunar orbit and in the descent: the Moon with no mark where the mesh is.
+- The frame times and the name "Landing" still on screen, as above.
+- The console, on a fresh load: no error, only the usual `THREE.Clock` warning.
+- Test first: the tests of `southCapUvs`, of `onUnitSphere` and of the requests leaving before the
+  drawing failed before the code. A try that did not help (a flat normal map for the mesh to share
+  the program of the sphere) was measured and taken out.
+- `npm run verify` passes, with 943 tests in 68 files and no lint warning.
+- Not verified: the lag on Marco's own browser and window, which is where he saw it; a slower
+  machine; the Earth, Moon and Sun view, which uses the same `MoonBody.jsx` without the relief
+  (its tests pass, it was not opened after this change).
+
 ---
 
 ## I: Miguel
