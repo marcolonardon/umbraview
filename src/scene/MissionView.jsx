@@ -729,7 +729,12 @@ export function MissionView({
         const dash = segment.kind === 'schematic' ? pathLength(points) / (2 * SCHEMATIC_DASHES) : 0
         return { key: segment.phase, center: segment.center, points, dash }
       }),
-      events: missionEvents(mission).map(({ key, center, positionKm }) => ({ key, center, position: kmToUnits(positionKm) })),
+      /* O instante de cada evento vai junto: é por ele que nextEvent acha o próximo. Sem ele, o nome
+         na cena era sempre o do pouso, desde o card C16 (achado em 19/11/2026, com a contagem do
+         painel de voo). */
+      events: missionEvents(mission).map(({ key, dateMs: eventMs, center, positionKm }) => ({
+        key, dateMs: eventMs, center, position: kmToUnits(positionKm),
+      })),
     }
   }, [mission])
   // a nave no instante do relógio
@@ -804,6 +809,11 @@ export function MissionView({
     [flying, mission, dateMs],
   )
   const elapsedHours = mission ? (dateMs - missionStartMs) / HOUR_MS : 0
+  // o próximo evento e quanto falta para ele, para o painel de voo; depois do pouso, nada
+  const upcomingEvent = flying ? nextEvent(path.events, dateMs) : null
+  const hudNext = upcomingEvent && upcomingEvent.dateMs > dateMs
+    ? { name: missionView.events[upcomingEvent.key], remainingHours: (upcomingEvent.dateMs - dateMs) / HOUR_MS }
+    : null
   /* Lançar: a vista passa de planejar para voar, o relógio volta ao lançamento e toca, e a câmera
      vai para a nave. É a pessoa que aperta: a vista não se mexe sozinha (README, "Accessibility"). */
   const launch = () => {
@@ -931,6 +941,7 @@ export function MissionView({
               phase={craft.phase}
               elapsedHours={elapsedHours}
               telemetry={telemetry}
+              next={hudNext}
               missionName={missionView.hudMission(landingSite.name ?? missionView.customLandingSite, launchSite.name)}
               playing={clock.playing}
               onTogglePlay={() => clock.setPlaying((value) => !value)}

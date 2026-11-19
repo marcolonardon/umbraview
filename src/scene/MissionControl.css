@@ -558,6 +558,24 @@
   font-size: var(--font-size-sm);
 }
 
+.mission-hud__next {
+  margin: 0;
+  font-size: var(--font-size-sm);
+  font-variant-numeric: tabular-nums;
+}
+
+.mission-hud__next-label,
+.mission-hud__next-name {
+  color: var(--color-text-secondary);
+  letter-spacing: var(--tracking-caps);
+  text-transform: uppercase;
+}
+
+.mission-hud__next-time {
+  color: var(--color-accent);
+  font-weight: var(--font-weight-medium);
+}
+
 .mission-hud__buttons {
   display: flex;
   flex-wrap: wrap;

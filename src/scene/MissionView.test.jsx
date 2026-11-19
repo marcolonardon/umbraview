@@ -655,6 +655,20 @@ describe('MissionView: voando', () => {
     expect(mostrador(missionView.gaugeSpeed)).toHaveTextContent(missionView.gaugeNone)
   })
 
+  /* Na órbita de espera a nave anda em círculo: a altura e a velocidade não mudam, e o painel
+     parecia travado no começo do voo (visto pelo Marco em 19/11/2026). A contagem até o próximo
+     evento, tirada dos instantes da missão, anda o tempo todo e diz o que vem. */
+  it('o painel de voo conta o tempo até o próximo evento, e o nome dele', () => {
+    voar()
+    irPara(150)
+    // na metade da órbita de espera, 35 min depois do lançamento; a saída da Terra é em 1 h
+    const proximo = screen.getByText(missionView.hudNext).closest('.mission-hud__next')
+    expect(proximo).toHaveTextContent(missionView.events.tli)
+    expect(proximo).toHaveTextContent(missionView.hudCountdown('25 min'))
+    irPara(160)
+    expect(screen.getByText(missionView.hudNext).closest('.mission-hud__next')).toHaveTextContent(missionView.hudCountdown('20 min'))
+  })
+
   /* A escala de cada mostrador acompanha o valor (gaugeScale), e aparece escrita: com a escala fixa
      no máximo da missão, a altura da órbita de espera não acendia nada (visto pelo Marco). */
   it('cada mostrador diz a escala em que está, e ela acompanha o valor', () => {

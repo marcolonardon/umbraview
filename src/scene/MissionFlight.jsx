@@ -74,11 +74,12 @@ function Gauge({ label, value, unit, fraction, scale }) {
      no trilho (arcPoint), então os dois apontam o mesmo lugar;
    - à direita, a fase de agora e uma frase sobre ela, e os botões de tocar, da velocidade e da câmera.
    layout, position, phase, elapsedHours: os pedaços do trilho, o lugar nele (de 0 a 1), a fase e o
-   tempo de missão. telemetry: a nave em números (telemetryAt). missionName: o local de pouso e a base, já em texto. playing, fast e freeCamera,
+   tempo de missão. telemetry: a nave em números (telemetryAt). next: o próximo evento,
+   { name, remainingHours }, ou null depois do pouso. missionName: o local de pouso e a base, já em texto. playing, fast e freeCamera,
    com os on*: os três botões. onSeek: chamada com o lugar do trilho, de 0 a 1. focusTarget: a ref do
    botão de tocar, para onde o foco vai quando o Launch sai da página (useKeepFocus). */
 export function MissionHud({
-  layout, position, phase, elapsedHours, telemetry, missionName,
+  layout, position, phase, elapsedHours, telemetry, next = null, missionName,
   playing, onTogglePlay, fast, onToggleFast, onSeek, freeCamera, onToggleFreeCamera, focusTarget,
 }) {
   const drawn = telemetry.kind === 'schematic'
@@ -167,6 +168,15 @@ export function MissionHud({
       <div className="mission-hud__side">
         <span className="mission-hud__event-title">{missionView.phaseNames[phase]}</span>
         <p className="mission-hud__event-note">{missionView.phaseNotes[phase]}</p>
+        {/* A contagem até o próximo evento: na órbita de espera e na lunar os mostradores ficam
+            parados, porque a órbita é um círculo, e o painel parecia travado (visto pelo Marco). */}
+        {next && (
+          <p className="mission-hud__next">
+            <span className="mission-hud__next-label">{missionView.hudNext}</span>{' '}
+            <span className="mission-hud__next-name">{next.name}</span>{' '}
+            <span className="mission-hud__next-time">{missionView.hudCountdown(formatElapsed(next.remainingHours))}</span>
+          </p>
+        )}
         <div className="mission-hud__buttons">
           <button ref={focusTarget} className="mission-hud__button" type="button" aria-pressed={playing} onClick={onTogglePlay}>
             {playing ? missionView.pause : missionView.play}

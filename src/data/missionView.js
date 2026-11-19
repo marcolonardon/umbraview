@@ -148,6 +148,10 @@ export const missionView = {
   gaugeAltitudeUnit: (body) => (body === 'moon' ? 'km · Moon' : 'km · Earth'),
   // nos trechos desenhados o mostrador não tem número
   gaugeNone: '—',
+  /* O próximo evento e quanto falta para ele: na órbita de espera e na lunar a altura e a velocidade
+     não mudam (a órbita é um círculo), e a contagem é o que anda no painel. */
+  hudNext: 'Next',
+  hudCountdown: (remaining) => `T− ${remaining}`,
   // a escala em que o mostrador está agora, que acompanha o valor (gaugeScale)
   gaugeScaleText: (scale) => `0–${scale}`,
   // a fase de agora, em uma frase: o que a nave está fazendo, pelo modelo da missão (src/engine/mission.js)
