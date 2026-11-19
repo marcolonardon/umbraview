@@ -98,6 +98,14 @@
   --duration-fast: 180ms;
   --duration-base: 240ms;
 
+  /* O painel de voo em estilo de transmissão (MissionControl.css): o espaçamento das letras dos
+     rótulos em caixa alta, e o escuro da faixa embaixo da cena, que deixa o texto legível sobre a
+     Terra iluminada. */
+  --tracking-caps: 0.08em;
+  --hud-shade: color-mix(in srgb, var(--color-bg) 82%, transparent);
+  /* Quanto o selo e o resumo do pouso sobem, voando, para não ficarem em cima da faixa. */
+  --hud-clearance: 12rem;
+
   /* Camadas */
   --z-panel: 10;
   --z-overlay: 100;

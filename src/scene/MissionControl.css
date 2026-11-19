@@ -314,151 +314,312 @@
   cursor: default;
 }
 
-/* O trilho do painel de voo: o botão de tocar, a Terra, o trilho, a Lua e a velocidade, numa linha. */
-.mission-track {
-  display: flex;
-  align-items: flex-start;
-  gap: var(--space-3);
+/* O painel de voo em estilo de transmissão (MissionHud, em MissionFlight.jsx): uma faixa embaixo da
+   cena, que escurece de baixo para cima, com os mostradores à esquerda, o arco e o tempo no meio, e
+   a fase de agora à direita. A faixa não pega o mouse: a cena embaixo dela continua girando; só os
+   controles pegam. */
+.mission-hud {
+  position: absolute;
+  right: 0;
+  bottom: 0;
+  left: 0;
+  z-index: var(--z-panel);
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 2.2fr) minmax(0, 1fr);
+  align-items: end;
+  gap: var(--space-4);
+  padding: var(--space-8) var(--space-4) var(--space-3);
+  background: linear-gradient(to top, var(--hud-shade) 0%, var(--hud-shade) 55%, transparent 100%);
+  pointer-events: none;
 }
 
-.mission-track__end {
-  padding-top: var(--space-1);
+/* Os rótulos curtos da faixa: caixa alta e espaçados, como nas transmissões. O texto continua
+   escrito normal em src/data/, para o leitor de tela. */
+.mission-hud__gauge-label,
+.mission-hud__caption,
+.mission-hud__mission,
+.mission-hud__event-title,
+.mission-hud__event text {
+  text-transform: uppercase;
+  letter-spacing: var(--tracking-caps);
+}
+
+.mission-hud__gauges {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: var(--space-1) var(--space-3);
+  max-width: 15rem;
+}
+
+.mission-hud__gauge {
+  position: relative;
+  display: grid;
+  justify-items: center;
+  align-content: center;
+  aspect-ratio: 1;
+}
+
+.mission-hud__gauge-dial {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+}
+
+.mission-hud__gauge-track,
+.mission-hud__gauge-fill {
+  fill: none;
+  stroke-width: 3;
+  stroke-linecap: round;
+}
+
+.mission-hud__gauge-track {
+  stroke: var(--color-border-control);
+  stroke-opacity: 0.5;
+}
+
+/* Sem transição: o número muda a cada quadro, e cada transição nova recomeçava a anterior, com o
+   arco sempre atrasado e aos trancos (visto pelo Marco em 19/11/2026). */
+.mission-hud__gauge-fill {
+  stroke: var(--color-text);
+}
+
+.mission-hud__gauge-label {
   color: var(--color-text-secondary);
+  font-size: var(--font-size-xs);
+}
+
+.mission-hud__gauge-value {
+  font-size: var(--font-size-lg);
+  font-weight: var(--font-weight-medium);
+  font-variant-numeric: tabular-nums;
+  line-height: 1.1;
+}
+
+.mission-hud__gauge-unit {
+  max-width: 80%;
+  color: var(--color-text-muted);
+  font-size: var(--font-size-xs);
+  line-height: 1.2;
+  text-align: center;
+}
+
+.mission-hud__gauge-scale {
+  color: var(--color-text-muted);
+  font-size: var(--font-size-xs);
+  font-variant-numeric: tabular-nums;
+  line-height: 1.2;
+}
+
+.mission-hud__caption {
+  grid-column: 1 / -1;
+  color: var(--color-text-secondary);
+  font-size: var(--font-size-xs);
+  text-align: center;
+}
+
+.mission-hud__center {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--space-1);
+  min-width: 0;
+}
+
+/* O arco e, por cima dele, o controle deslizante invisível do mesmo tamanho: quem recebe o mouse e
+   as setas é o controle; o foco dele aparece como o anel do próprio arco. */
+.mission-hud__arc {
+  position: relative;
+  width: 100%;
+  pointer-events: auto;
+}
+
+.mission-hud__arc:has(.mission-hud__range:focus-visible) {
+  border-radius: var(--radius-md);
+  box-shadow: var(--focus-ring);
+}
+
+.mission-hud__arc-svg {
+  display: block;
+  width: 100%;
+  height: auto;
+  overflow: visible;
+}
+
+/* Sem vector-effect: o tracejado da parte voada é medido no comprimento do caminho (pathLength), e
+   com a linha de largura fixa na tela o navegador mede o tracejado em pixels da tela. */
+.mission-hud__arc-line,
+.mission-hud__arc-flown {
+  fill: none;
+}
+
+.mission-hud__arc-line {
+  stroke: var(--color-text-muted);
+  stroke-width: 1;
+}
+
+.mission-hud__arc-flown {
+  stroke: var(--color-text);
+  stroke-width: 2;
+}
+
+.mission-hud__event circle {
+  fill: var(--color-bg);
+  stroke: var(--color-text-secondary);
+  stroke-width: 1.5;
+  vector-effect: non-scaling-stroke;
+}
+
+.mission-hud__event[data-done='true'] circle {
+  stroke: var(--color-text);
+}
+
+.mission-hud__event[data-current='true'] circle {
+  fill: var(--color-accent);
+  stroke: var(--color-accent);
+}
+
+.mission-hud__event text {
+  fill: var(--color-text-secondary);
   font-size: var(--font-size-sm);
 }
 
-.mission-track__rail {
-  flex: 1;
-  min-width: 0;
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-1);
+.mission-hud__event[data-current='true'] text {
+  fill: var(--color-text);
 }
 
-/* O trilho mede a si mesmo: é pela largura dele, e não da tela, que a legenda decide se os nomes
-   das fases cabem (mais abaixo). */
-.mission-track__rail {
-  container-type: inline-size;
+.mission-hud__arc-craft {
+  fill: var(--color-text);
 }
 
-/* Em tela estreita o trilho fica com a linha inteira, entre a Terra e a Lua, e os três botões
-   descem para a linha de baixo. Numa linha só os botões não encolhiam, e o trilho ficava com
-   largura zero (medido a 375 px, card C17, fase 5). A mesma largura em que a página passa a uma
-   coluna (App.css). */
-@media (max-width: 900px) {
-  .mission-track {
-    flex-wrap: wrap;
-    row-gap: var(--space-1);
-  }
-
-  .mission-track__end,
-  .mission-track__rail {
-    order: -1;
-  }
-
-  /* a quebra de linha entre o trilho e os botões: sem ela, os botões que coubessem subiam para
-     a linha do trilho, e os outros ficavam sozinhos embaixo */
-  .mission-track::before {
-    content: '';
-    flex-basis: 100%;
-  }
-}
-
-/* O cursor do trilho: a parte já voada vem na cor de destaque, que o navegador pinta sozinho. */
-.mission-track__range {
+.mission-hud__range {
+  position: absolute;
+  inset: 0;
   width: 100%;
+  height: 100%;
   margin: 0;
-  accent-color: var(--color-accent);
+  opacity: 0;
+  cursor: pointer;
 }
 
-/* A legenda: o nome de cada fase embaixo do pedaço dela. A largura de cada um vem da missão
-   (flex-grow, posto pelo componente); a base zero faz as larguras seguirem só esse peso. */
-.mission-track__phases {
-  display: flex;
+/* A legenda das fases e os números do cartão de voo, só para o leitor de tela: na tela, os nomes
+   estão no arco e os números, nos mostradores. */
+.mission-hud__phases,
+.mission-hud__hidden {
+  position: absolute;
+  width: 1px;
+  height: 1px;
   margin: 0;
   padding: 0;
-  list-style: none;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
 }
 
-.mission-track__phase {
-  flex-basis: 0;
-  min-width: 0;
-  padding-top: var(--space-1);
-  border-top: 1px solid var(--color-border-control);
-  color: var(--color-text-muted);
-  font-size: var(--font-size-xs);
+.mission-hud__clock {
+  display: flex;
+  justify-content: center;
+}
+
+.mission-hud__time {
+  font-size: var(--font-size-xl);
+  font-weight: var(--font-weight-medium);
+  font-variant-numeric: tabular-nums;
+  letter-spacing: var(--tracking-caps);
+  line-height: 1.1;
+}
+
+.mission-hud__mission {
   overflow: hidden;
+  max-width: 100%;
+  color: var(--color-text-secondary);
+  font-size: var(--font-size-xs);
   text-overflow: ellipsis;
   white-space: nowrap;
 }
 
-.mission-track__phase + .mission-track__phase {
-  padding-left: var(--space-2);
-  border-left: 1px solid var(--color-border-control);
-}
-
-.mission-track__phase[data-done='true'] {
-  border-top-color: var(--color-accent);
-  color: var(--color-text-secondary);
-}
-
-.mission-track__phase[aria-current='step'] {
-  border-top-color: var(--color-accent);
-  color: var(--color-accent);
-  font-weight: var(--font-weight-medium);
-}
-
-/* Num trilho estreito os nomes das fases não cabem embaixo dos pedaços (a subida tem um nono do
-   trilho), e cortados com reticências não diziam nada. Os nomes saem da vista e ficam para o
-   leitor de tela; na tela sobra a barra dos seis pedaços, mais grossa, com o de agora na cor de
-   destaque. A fase de agora, por extenso, está no cartão de voo. */
-@container (max-width: 42rem) {
-  .mission-track__phase-name {
-    position: absolute;
-    width: 1px;
-    height: 1px;
-    overflow: hidden;
-    clip-path: inset(50%);
-    white-space: nowrap;
-  }
-
-  .mission-track__phase {
-    padding-top: 0;
-    border-top-width: var(--space-1);
-  }
-
-  .mission-track__phase + .mission-track__phase {
-    padding-left: 0;
-  }
-}
-
-/* O cartão de voo, por cima da cena: a fase, o tempo de missão em destaque e os números. */
-.mission-telemetry {
+.mission-hud__side {
   display: flex;
   flex-direction: column;
+  align-items: flex-end;
   gap: var(--space-1);
-  padding: var(--space-3) var(--space-4);
-  border: 1px solid var(--color-border);
-  border-radius: var(--radius-md);
-  background: var(--color-surface);
+  text-align: right;
 }
 
-.mission-telemetry__phase {
-  color: var(--color-accent);
-  font-size: var(--font-size-sm);
-  font-weight: var(--font-weight-medium);
-}
-
-.mission-telemetry__time {
+.mission-hud__event-title {
   font-size: var(--font-size-lg);
   font-weight: var(--font-weight-medium);
-  font-variant-numeric: tabular-nums;
 }
 
-.mission-telemetry__numbers {
+.mission-hud__event-note {
+  max-width: 22rem;
+  margin: 0;
   color: var(--color-text-secondary);
   font-size: var(--font-size-sm);
-  font-variant-numeric: tabular-nums;
+}
+
+.mission-hud__buttons {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: var(--space-1);
+  margin-top: var(--space-2);
+  pointer-events: auto;
+}
+
+.mission-hud__button {
+  padding: var(--space-1) var(--space-2);
+  border: 1px solid var(--color-border-control);
+  border-radius: var(--radius-sm);
+  background: var(--color-bg);
+  color: var(--color-text);
+  font: inherit;
+  font-size: var(--font-size-xs);
+  letter-spacing: var(--tracking-caps);
+  text-transform: uppercase;
+  cursor: pointer;
+  transition: transform var(--duration-press) var(--ease-out);
+}
+
+.mission-hud__button[aria-pressed='true'] {
+  border-color: var(--color-text);
+}
+
+.mission-hud__button:active {
+  transform: scale(0.97);
+}
+
+/* Telas médias: a faixa ganha duas linhas, o arco e o tempo em cima, de ponta a ponta, e os
+   mostradores e a fase embaixo, um de cada lado. */
+@media (max-width: 900px) {
+  .mission-hud {
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+    gap: var(--space-2) var(--space-3);
+    padding-top: var(--space-6);
+  }
+
+  .mission-hud__center {
+    grid-column: 1 / -1;
+    order: -1;
+  }
+
+  .mission-hud__gauges {
+    max-width: 12rem;
+  }
+}
+
+/* Celular: a faixa sai de cima da cena e fica embaixo dela, sem o degradê, como o resumo e o selo
+   já faziam: por cima, ela cobria a cena quase toda. */
+@media (max-width: 600px) {
+  .mission-hud {
+    position: static;
+    padding: var(--space-3) 0 0;
+    background: none;
+  }
+
+  .mission-hud__time {
+    font-size: var(--font-size-lg);
+  }
 }
 
 /* O mapa do trajeto inteiro, no canto de cima da cena, abaixo do seletor de vista. */

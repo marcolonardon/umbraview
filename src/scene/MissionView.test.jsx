@@ -633,6 +633,42 @@ describe('MissionView: voando', () => {
     expect(voo()).toHaveTextContent('0.23 km/s')
   })
 
+  /* O painel de voo em estilo de transmissão (pedido pelo Marco em 19/11/2026, inspirado nas
+     transmissões de lançamento): o nome da missão embaixo do relógio, dois mostradores redondos da
+     nave e, do outro lado, o que a fase de agora é, em uma frase. */
+  it('o painel de voo diz o nome da missão e o que é a fase de agora, em uma frase', () => {
+    voar()
+    expect(screen.getByText(missionView.hudMission(IM2.name, KENNEDY.name))).toBeInTheDocument()
+    irPara(200)
+    expect(screen.getByText(missionView.phaseNotes.crossing)).toBeInTheDocument()
+    irPara(500)
+    expect(screen.getByText(missionView.phaseNotes.lunarOrbit)).toBeInTheDocument()
+  })
+
+  it('os mostradores da velocidade e da altura mostram o número do cartão, e somem nos trechos desenhados', () => {
+    voar()
+    irPara(200)
+    const mostrador = (rotulo) => screen.getByText(rotulo).closest('.mission-hud__gauge')
+    expect(mostrador(missionView.gaugeSpeed)).toHaveTextContent('0.03')
+    expect(mostrador(missionView.gaugeAltitude)).toHaveTextContent('622')
+    irPara(50)
+    expect(mostrador(missionView.gaugeSpeed)).toHaveTextContent(missionView.gaugeNone)
+  })
+
+  /* A escala de cada mostrador acompanha o valor (gaugeScale), e aparece escrita: com a escala fixa
+     no máximo da missão, a altura da órbita de espera não acendia nada (visto pelo Marco). */
+  it('cada mostrador diz a escala em que está, e ela acompanha o valor', () => {
+    voar()
+    const mostrador = (rotulo) => screen.getByText(rotulo).closest('.mission-hud__gauge')
+    irPara(200)
+    // 622 km sobre a Terra e 0,03 km/s: as escalas de 1.000 km e de 0,05 km/s
+    expect(mostrador(missionView.gaugeAltitude)).toHaveTextContent(missionView.gaugeScaleText('1,000'))
+    expect(mostrador(missionView.gaugeSpeed)).toHaveTextContent(missionView.gaugeScaleText('0.05'))
+    irPara(500)
+    // 5.263 km sobre a Lua: a escala sobe para 10.000 km
+    expect(mostrador(missionView.gaugeAltitude)).toHaveTextContent(missionView.gaugeScaleText('10,000'))
+  })
+
   it('nos dois trechos desenhados o cartão diz que é desenho, e não mostra altura nem velocidade', () => {
     voar()
     irPara(50)

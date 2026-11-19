@@ -142,3 +142,13 @@
 .mission-view__event-tag--raised {
   transform: translateY(calc(-1 * var(--space-5)));
 }
+
+/* Voando, a faixa do painel de voo (MissionHud) ocupa a parte de baixo da cena: o selo e o resumo do
+   pouso sobem para cima dela. No celular a faixa fica embaixo da cena, e eles também. */
+@media (min-width: 601px) {
+  .mission-view__stage--flying > .mission-view__badge,
+  .mission-view__stage--flying > .mission-complete {
+    bottom: var(--hud-clearance);
+  }
+}
+

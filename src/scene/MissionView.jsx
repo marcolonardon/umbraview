@@ -38,7 +38,7 @@ import { EarthBody } from './EarthBody.jsx'
 import { LandingAreasLayer } from './LandingAreasLayer.jsx'
 import { sunSideStart } from './framing.js'
 import { LAUNCH_STEP, MissionControl } from './MissionControl.jsx'
-import { MissionComplete, MissionTelemetry, MissionTrack, TRACK_STEPS } from './MissionFlight.jsx'
+import { MissionComplete, MissionHud, TRACK_STEPS } from './MissionFlight.jsx'
 import { mapPoint, missionMap } from './missionMap.js'
 import { MissionMap } from './MissionMap.jsx'
 import {
@@ -831,7 +831,7 @@ export function MissionView({
       {/* A cena ocupa a largura toda, e o que se usa para montar e voar a missão fica por cima
           dela. Os controles são irmãos da cena, e não filhos: a cena é uma imagem para o leitor de
           tela (role="img"), e o que fica dentro de uma imagem não é lido. */}
-      <div className="mission-view__stage">
+      <div className={flying ? 'mission-view__stage mission-view__stage--flying' : 'mission-view__stage'}>
         {/* A área da cena: a cena e o que fica por cima dela e se prende às bordas dela. O selo e o
             resumo ficam fora, porque em tela de celular descem para baixo da cena. */}
         <div className="mission-view__scene-area">
@@ -876,7 +876,6 @@ export function MissionView({
               <button className="view-clock__button" type="button" onClick={changeMission}>
                 {missionView.changeMission}
               </button>
-              <MissionTelemetry telemetry={telemetry} elapsedHours={elapsedHours} />
               {/* O que o leitor de tela ouve durante o voo: a troca de fase e o pouso. O cartão de voo
                   não serve para isso: os números dele mudam a cada quadro. Fora da vista, porque na
                   tela o cartão já diz a fase. */}
@@ -926,6 +925,24 @@ export function MissionView({
           )}
           {/* O trajeto inteiro, em escala, num canto: na cena, com a câmera na nave, ele não cabe. */}
           {flying && (
+            <MissionHud
+              layout={layout}
+              position={trackPosition}
+              phase={craft.phase}
+              elapsedHours={elapsedHours}
+              telemetry={telemetry}
+              missionName={missionView.hudMission(landingSite.name ?? missionView.customLandingSite, launchSite.name)}
+              playing={clock.playing}
+              onTogglePlay={() => clock.setPlaying((value) => !value)}
+              fast={fast}
+              onToggleFast={() => setFast((value) => !value)}
+              onSeek={(position) => clock.seek(position * TRACK_STEPS)}
+              freeCamera={freeCamera}
+              onToggleFreeCamera={() => setFreeCamera((value) => !value)}
+              focusTarget={focusTarget}
+            />
+          )}
+          {flying && (
             <MissionMap
               map={map}
               craft={craftOnMap}
@@ -947,25 +964,6 @@ export function MissionView({
           </details>
         )}
       </div>
-
-      {/* Voando: o trilho da missão. Planejando não há relógio: parado no lançamento, ele não teria
-          o que mostrar. */}
-      {flying && (
-        <MissionTrack
-          layout={layout}
-          position={trackPosition}
-          phase={craft.phase}
-          elapsedHours={elapsedHours}
-          playing={clock.playing}
-          onTogglePlay={() => clock.setPlaying((value) => !value)}
-          fast={fast}
-          onToggleFast={() => setFast((value) => !value)}
-          onSeek={(position) => clock.seek(position * TRACK_STEPS)}
-          freeCamera={freeCamera}
-          onToggleFreeCamera={() => setFreeCamera((value) => !value)}
-          focusTarget={focusTarget}
-        />
-      )}
 
       {/* Os números e as notas, recolhidos: abertos, eram um muro de texto embaixo da cena. */}
       <details className="mission-view__details">

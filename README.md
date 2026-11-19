@@ -425,7 +425,7 @@ umbraview/
 │   │   ├── LunarScene.jsx           the Moon, the Sun's light for the date and the camera that rotates with the mouse
 │   │   ├── MissionControl.css
 │   │   ├── MissionControl.jsx       mission control, over the scene: a label per step, the card of the open step and the Launch button (card C17)
-│   │   ├── MissionFlight.jsx        the flight panel: the track of the mission, the flight card and the summary at the landing (card C17)
+│   │   ├── MissionFlight.jsx        the flight panel: a broadcast-style band under the scene, with the arc of the mission, the time, the gauges and the phase, and the summary at the landing (card C17)
 │   │   ├── MissionMap.jsx           the small map of the flight, in a corner of the scene: the whole path to scale, with the spacecraft (card C17)
 │   │   ├── MissionView.css
 │   │   ├── MissionView.jsx          the mission view: the Earth and the Moon to scale, with the launch sites on the Earth (card C13)
@@ -447,6 +447,7 @@ umbraview/
 │   │   ├── ViewClock.css
 │   │   ├── ViewClock.jsx            the row of controls of those two views: play, the clock cursor and the hour
 │   │   ├── cssToken.js              the value of a token of tokens.css, for the colors the 3D drawing needs
+│   │   ├── missionHud.js            the numbers of the flight panel in broadcast style: the arc of the track and the gauges of the spacecraft
 │   │   ├── missionMap.js            the numbers of the small map of the flight: the crossing, the orbit of the Moon and the frame, in km (card C17)
 │   │   ├── missionPath.js           the path of the mission for the drawing: the spacecraft at an instant, the events and the camera that follows it (card C16)
 │   │   ├── missionPicking.js        the clicks of the mission view: on the mark of a launch site, and on the Moon, which chooses the landing site

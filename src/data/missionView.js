@@ -136,6 +136,29 @@ export const missionView = {
     `${Math.round(altitudeKm).toLocaleString('en-US')} km above the ${body === 'moon' ? 'Moon' : 'Earth'} · ${speedKmS.toFixed(2)} km/s`,
   // nos dois trechos desenhados não há número: os pontos do caminho são desenho
   drawnValue: 'Drawn, not computed',
+  /* O painel de voo em estilo de transmissão (pedido pelo Marco em 19/11/2026): o nome da missão
+     embaixo do relógio, os dois mostradores da nave e uma frase sobre a fase de agora. Os números
+     dos mostradores são os mesmos do cartão de voo; o arco aceso é a parte do máximo desta missão. */
+  hudMission: (landing, launch) => `${landing} · ${launch}`,
+  hudTelemetry: 'Spacecraft telemetry',
+  gaugeSpeed: 'Velocity',
+  gaugeSpeedUnit: 'km/s',
+  gaugeAltitude: 'Altitude',
+  // a unidade e o corpo de onde a altura é contada, curtos: cabem dentro do mostrador
+  gaugeAltitudeUnit: (body) => (body === 'moon' ? 'km · Moon' : 'km · Earth'),
+  // nos trechos desenhados o mostrador não tem número
+  gaugeNone: '—',
+  // a escala em que o mostrador está agora, que acompanha o valor (gaugeScale)
+  gaugeScaleText: (scale) => `0–${scale}`,
+  // a fase de agora, em uma frase: o que a nave está fazendo, pelo modelo da missão (src/engine/mission.js)
+  phaseNotes: {
+    ascent: 'Climbing from the pad to the parking orbit. This part is drawn, not computed.',
+    parking: 'Coasting around the Earth until the point where the burn to the Moon begins.',
+    crossing: 'Coasting to the Moon after the burn that left Earth orbit, pulled by the Earth, the Moon and the Sun.',
+    lunarOrbit: 'Circling the Moon after the burn that slowed the spacecraft into lunar orbit.',
+    descent: 'Falling from the lunar orbit to the low point, a few kilometres above the ground.',
+    landing: 'The final descent to the landing site. This part is drawn, not computed.',
+  },
   phaseNames: {
     ascent: 'Climb',
     parking: 'Parking orbit',
