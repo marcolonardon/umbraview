@@ -4,7 +4,7 @@ import { describe, expect, it } from 'vitest'
 import { MISSION } from './config.js'
 import { EARTH_EQUATORIAL_RADIUS_KM, earthSiteEquatorialKm, earthSiteKm } from './earthSite.js'
 import { MOON_RADIUS_M } from './geometry.js'
-import { computeMission, designMission } from './mission.js'
+import { computeMission, designMission, launchReach } from './mission.js'
 import { GM_KM3_S2 } from './orbit.js'
 import { systemStateAt } from './system.js'
 
@@ -371,5 +371,68 @@ describe('a missão no formato da tela (computeMission)', () => {
   it('não entrega o que é só do motor: a efeméride e os estados ficam no designMission', () => {
     expect(missao.ephemeris).toBeUndefined()
     expect(missao.paths).toBeUndefined()
+  })
+})
+
+/* Card C19: cada base só lança para alguns lados (azimuthLimits, em src/data/launchSites.js). A
+   missão respeita a faixa, mudando a hora do lançamento no dia, e diz quando a base não alcança. As
+   faixas daqui são de teste, e não as de verdade das bases. */
+describe('as direções de lançamento permitidas (card C19)', () => {
+  const comFaixa = (minDeg, maxDeg) => ({ ...KENNEDY, azimuthLimits: [{ minDeg, maxDeg }] })
+
+  it('uma base sem faixa conferida (null) dá a mesma missão de sempre', () => {
+    const semFaixa = designMission({ ...PEDIDO, launchSite: { ...KENNEDY, azimuthLimits: null } })
+    expect(semFaixa.launchMs).toBe(projeto.launchMs)
+    expect(semFaixa.launchAzimuthDeg).toBeCloseTo(projeto.launchAzimuthDeg, 9)
+  })
+
+  it('uma faixa que já contém o lançamento de sempre não muda nada', () => {
+    const resultado = designMission({ ...PEDIDO, launchSite: comFaixa(35, 120) })
+    expect(resultado.launchMs).toBe(projeto.launchMs)
+  })
+
+  it('uma faixa só para o sudeste muda a hora do lançamento, e a missão sai dentro dela e fecha', () => {
+    const resultado = designMission({ ...PEDIDO, launchSite: comFaixa(140, 170) })
+    expect(resultado.launchAzimuthDeg).toBeGreaterThanOrEqual(140)
+    expect(resultado.launchAzimuthDeg).toBeLessThanOrEqual(170)
+    expect(resultado.launchMs).not.toBe(projeto.launchMs)
+    expect(Math.abs(resultado.pass.distanceKm - RAIO_DA_LUA_KM - MISSION.lunarOrbitAltitudeKm)).toBeLessThan(0.001)
+    // mais inclinada que a de sempre: a Terra ajuda menos, e é o preço de lançar para o lado permitido
+    expect(resultado.parkingInclinationDeg).toBeGreaterThan(projeto.parkingInclinationDeg + 10)
+  })
+
+  /* A mira gira o plano em volta da base depois da busca do horário: de 0,2° a 2,9° nos casos medidos
+     em 19/11/2026. Com a folga fixa de 1°, estas duas janelas davam erro mesmo com a base alcançando
+     a órbita (visto no navegador). */
+  it.each([
+    ['19/11', '2026-11-19T20:05:00Z', '2026-11-30T19:17:00Z'],
+    ['15/12', '2026-12-15T03:17:00Z', '2026-12-19T19:04:00Z'],
+  ])('a mira que empurra o lançamento para fora da faixa tenta de novo mais para dentro (janela de %s)', (_, inicio, fim) => {
+    const landingWindow = { startUtc: new Date(inicio), endUtc: new Date(fim) }
+    const resultado = designMission({ launchSite: comFaixa(140, 170), landingSite: IM2, landingWindow })
+    expect(resultado.launchAzimuthDeg).toBeGreaterThanOrEqual(140)
+    expect(resultado.launchAzimuthDeg).toBeLessThanOrEqual(170)
+  })
+
+  it('uma faixa só para o oeste não alcança: o erro diz que é a direção do lançamento', () => {
+    let erro = null
+    try {
+      designMission({ ...PEDIDO, launchSite: comFaixa(200, 250) })
+    } catch (error) {
+      erro = error
+    }
+    expect(erro).not.toBeNull()
+    expect(erro.code).toBe('azimuth')
+  })
+
+  it('a conta rápida diz, para cada base, se ela alcança a órbita, sem mirar a missão', () => {
+    const bases = [
+      { id: 'livre', ...KENNEDY, azimuthLimits: null },
+      { id: 'leste', ...comFaixa(35, 120) },
+      { id: 'sudeste', ...comFaixa(140, 170) },
+      { id: 'oeste', ...comFaixa(200, 250) },
+    ]
+    const alcance = launchReach({ launchSites: bases, landingSite: IM2, landingWindow: PEDIDO.landingWindow })
+    expect(alcance).toEqual({ livre: 'unchecked', leste: 'ok', sudeste: 'ok', oeste: 'blocked' })
   })
 })

@@ -29,6 +29,7 @@ import { AIMING, MISSION } from './config.js'
 import { EARTH_EQUATORIAL_RADIUS_KM, EARTH_SIDEREAL_DAY_HOURS, earthSiteEquatorialKm } from './earthSite.js'
 import { moonFixedFrameAt } from './ephemeris.js'
 import { MOON_RADIUS_M, latLonToUnit } from './geometry.js'
+import { allowsAzimuth, launchAzimuthDeg } from './launchLimits.js'
 import { GM_KM3_S2, createEphemeris, propagate, propagateToMoonPass } from './orbit.js'
 import { ECLIPTIC_SKY_MATRIX } from './system.js'
 
@@ -44,6 +45,12 @@ const ALL_GRAVITY = Object.freeze({ moon: 1, sun: 1 })
 const LAUNCH_SEARCH_STEP_MS = 4 * 60e3
 // dois horários contam como "a menor inclinação" se diferem menos que isto
 const SAME_INCLINATION = 0.05 * DEG
+/* Na busca do horário, a faixa de azimutes da base encolhe por dentro (card C19): depois dela a mira
+   ainda gira o plano em volta da base, e o lançamento na borda exata da faixa sairia dela. Medido em
+   19/11/2026, de Kennedy com a faixa de 140° a 170° em três janelas de novembro e dezembro de 2026, a
+   mira girou de 0,2° a 2,9°: com 1° de folga, duas das três missões saíam da faixa. A busca tenta
+   uma folga de cada vez, da menor para a maior, e fica com a primeira missão que sai dentro. */
+const AZIMUTH_MARGINS_DEG = Object.freeze([1, 3, 6, 10])
 /* Se o primeiro chute põe a queima de saída a menos que isto da entrada na órbita, a nave dá mais
    uma volta antes: a mira pode puxar a queima para mais cedo, e ela não pode cair antes de a
    nave estar na órbita. */
@@ -129,52 +136,51 @@ function solve3(A, b) {
   return [m[0][3] / m[0][0], m[1][3] / m[1][1], m[2][3] / m[2][2]]
 }
 
-/* launchSite e landingSite: { lat, lon } em graus (a base na Terra e o local na Lua).
-   landingWindow: a janela de pouso, { startUtc, endUtc }, como vem em sky.landingWindows.
-   parameters: os números da missão (MISSION, no config.js); só os testes trocam.
-
-   Devolve a missão no referencial do motor: os instantes em milissegundos UTC, os estados
-   { dateMs, positionKm, velocityKmS } de cada evento, os números e o caminho de cada trecho
-   integrado (paths). Lança um erro quando não há caminho: a tela mostra que não achou. */
-export function designMission({ launchSite, landingSite, landingWindow }, parameters = MISSION) {
+/* Os tempos da missão que só dependem da janela e dos números do modelo: quando o pouso é
+   mirado, quando a nave chega à Lua e quando o lançamento cairia sem olhar a hora do dia. São os
+   mesmos para qualquer base; a conta rápida de quais bases servem (launchReach) usa só eles. */
+function missionClock(landingWindow, parameters) {
   const windowStartMs = landingWindow.startUtc.getTime()
   const windowEndMs = landingWindow.endUtc.getTime()
   if (!(windowEndMs > windowStartMs)) throw new Error('a janela de pouso termina antes de começar')
   const landingAimMs = windowStartMs + Math.min(parameters.landingAimHours * HOUR_MS, (windowEndMs - windowStartMs) / 2)
-
   const parkingKm = EARTH_EQUATORIAL_RADIUS_KM + parameters.parkingAltitudeKm
   const parkingSpeed = Math.sqrt(GM_KM3_S2.earth / parkingKm)
   const parkingRate = parkingSpeed / parkingKm // radianos por segundo
   const ascentMs = parameters.ascentMinutes * 60e3
-  const ascentArc = parameters.ascentArcDeg * DEG
-
   const lunarKm = MOON_RADIUS_KM + parameters.lunarOrbitAltitudeKm
-  const lunarRate = Math.sqrt(GM_KM3_S2.moon / lunarKm ** 3)
   const lowPointKm = MOON_RADIUS_KM + parameters.descentLowPointKm
   // a elipse de descida: meia volta, do círculo até o ponto baixo
   const descentMs = Math.PI * Math.sqrt(((lunarKm + lowPointKm) / 2) ** 3 / GM_KM3_S2.moon) * 1000
   const poweredMs = parameters.poweredDescentMinutes * 60e3
-  const poweredArc = parameters.poweredDescentArcDeg * DEG
   const stayMs = parameters.lunarOrbitStayHours * HOUR_MS
   const crossingMs = parameters.crossingDays * DAY_MS
-
-  // o local de pouso e o polo norte da Lua no espaço, no instante do pouso
-  const toEquatorial = moonToEquatorial(landingAimMs)
-  const landingSiteDirection = toEquatorial(latLonToUnit(landingSite.lat, landingSite.lon))
-  const moonPole = toEquatorial([0, 0, 1])
-
   // a hora de chegada à Lua, antes de a mira acertar a espera na órbita lunar
   const arrivalMs = landingAimMs - poweredMs - descentMs - stayMs
-  const ephemeris = createEphemeris(arrivalMs - crossingMs - 3 * DAY_MS, landingAimMs + DAY_MS)
-  const moonAtArrivalKm = ephemeris.moon(arrivalMs).positionKm
-  const moonDirection = unit(moonAtArrivalKm)
-
-  /* O lançamento. A travessia é um arco em volta da Terra que termina na Lua, então o plano dela
-     contém a direção da Lua na chegada; e contém a base, no instante do lançamento. Conforme a
-     Terra gira, a base muda de lugar e esse plano muda de inclinação: duas vezes por dia ele fica
-     o menos inclinado que dá, que é a latitude da base ou a altura da Lua sobre o equador, a que
-     for maior. A inclinação é medida do polo da Terra na data, e não do de J2000. */
   const nominalLaunchMs = arrivalMs - crossingMs - ascentMs - (Math.PI / parkingRate) * 1000
+  return {
+    landingAimMs, parkingKm, parkingSpeed, parkingRate, ascentMs, lunarKm, lowPointKm, descentMs, poweredMs, stayMs, crossingMs,
+    arrivalMs, nominalLaunchMs,
+  }
+}
+
+/* Os horários de lançamento de uma base, perto de nominalLaunchMs, com a menor inclinação que a
+   faixa de azimutes dela permite.
+
+   A travessia é um arco em volta da Terra que termina na Lua, então o plano dela contém a direção
+   da Lua na chegada (moonDirection); e contém a base, no instante do lançamento. Conforme a Terra
+   gira, a base muda de lugar e esse plano muda de inclinação: duas vezes por dia ele fica o menos
+   inclinado que dá, que é a latitude da base ou a altura da Lua sobre o equador, a que for maior.
+   A inclinação é medida do polo da Terra na data, e não do de J2000.
+
+   Com uma faixa de azimutes (launchSite.azimuthLimits, card C19), só valem os instantes em que o
+   azimute cai nela, com marginDeg de folga. Se o mínimo do dia fica fora, vale a borda da
+   faixa mais perto dele: o horário permitido de menor inclinação.
+
+   Devolve { candidates, earthPole, padDirection, planeNormal }: candidates em ordem de preferência,
+   cada um { launchMs, inclination }, vazio se nenhum instante serve. */
+function launchCandidates(launchSite, moonDirection, nominalLaunchMs, marginDeg = AZIMUTH_MARGINS_DEG[0]) {
+  const limits = launchSite.azimuthLimits ?? null
   const earthPole = unit(earthSiteEquatorialKm(90, 0, nominalLaunchMs))
   const padDirection = (dateMs) => unit(earthSiteEquatorialKm(launchSite.lat, launchSite.lon, dateMs))
   const planeNormal = (dateMs) => {
@@ -189,39 +195,130 @@ export function designMission({ launchSite, landingSite, landingWindow }, parame
     const n = planeNormal(dateMs)
     return n ? Math.acos(Math.min(1, dot(n, earthPole))) : Math.PI / 2
   }
+  const allowed = (dateMs) => {
+    if (!limits) return true
+    const n = planeNormal(dateMs)
+    return n !== null && allowsAzimuth(limits, launchAzimuthDeg(padDirection(dateMs), n, earthPole), marginDeg)
+  }
 
   const searchMs = EARTH_SIDEREAL_DAY_HOURS * HOUR_MS
   const count = Math.round((2 * searchMs) / LAUNCH_SEARCH_STEP_MS)
   const firstMs = nominalLaunchMs - searchMs
-  const samples = Array.from({ length: count + 1 }, (_, i) => inclination(firstMs + i * LAUNCH_SEARCH_STEP_MS))
+  const at = (i) => firstMs + i * LAUNCH_SEARCH_STEP_MS
+  const samples = Array.from({ length: count + 1 }, (_, i) => inclination(at(i)))
+  const open = Array.from({ length: count + 1 }, (_, i) => allowed(at(i)))
   const candidates = []
   for (let i = 1; i < count; i += 1) {
-    if (samples[i] > samples[i - 1] || samples[i] >= samples[i + 1]) continue
-    // o mínimo está entre o ponto de antes e o de depois: corta o intervalo em três até fechar
-    let low = firstMs + (i - 1) * LAUNCH_SEARCH_STEP_MS
-    let high = low + 2 * LAUNCH_SEARCH_STEP_MS
-    for (let k = 0; k < 40; k += 1) {
-      const a = low + (high - low) / 3
-      const b = high - (high - low) / 3
-      if (inclination(a) < inclination(b)) high = b
-      else low = a
+    if (!open[i]) continue
+    if (open[i - 1] && open[i + 1]) {
+      if (samples[i] > samples[i - 1] || samples[i] >= samples[i + 1]) continue
+      // o mínimo está entre o ponto de antes e o de depois: corta o intervalo em três até fechar
+      let low = at(i - 1)
+      let high = low + 2 * LAUNCH_SEARCH_STEP_MS
+      for (let k = 0; k < 40; k += 1) {
+        const a = low + (high - low) / 3
+        const b = high - (high - low) / 3
+        if (inclination(a) < inclination(b)) high = b
+        else low = a
+      }
+      const launchMs = (low + high) / 2
+      candidates.push({ launchMs, inclination: inclination(launchMs) })
+      continue
     }
-    const launchMs = (low + high) / 2
-    candidates.push({ launchMs, inclination: inclination(launchMs) })
+    /* A borda de um trecho permitido, com a inclinação descendo para o lado barrado: o mínimo do
+       dia ficou do outro lado, e o melhor permitido é a borda. Corta o passo ao meio até achar o
+       instante em que a faixa começa. */
+    const towardBlocked = !open[i - 1] ? -1 : 1
+    if (samples[i] <= samples[i + towardBlocked]) continue
+    let inside = at(i)
+    let outside = at(i + towardBlocked)
+    for (let k = 0; k < 30; k += 1) {
+      const middle = (inside + outside) / 2
+      if (allowed(middle)) inside = middle
+      else outside = middle
+    }
+    candidates.push({ launchMs: inside, inclination: inclination(inside) })
   }
-  if (candidates.length === 0) throw new Error('nenhum horário de lançamento encontrado para a base')
+  if (candidates.length === 0) return { candidates, earthPole, padDirection, planeNormal }
   const lowest = Math.min(...candidates.map((candidate) => candidate.inclination))
   // entre os de menor inclinação, primeiro o que deixa a travessia mais perto do tempo pedido
   const ordered = candidates
     .filter((candidate) => candidate.inclination < lowest + SAME_INCLINATION)
     .sort((a, b) => Math.abs(a.launchMs - nominalLaunchMs) - Math.abs(b.launchMs - nominalLaunchMs))
+  return { candidates: ordered, earthPole, padDirection, planeNormal }
+}
+
+// o erro de quando a base não tem horário para lançar na direção que ela permite
+function azimuthError() {
+  return Object.assign(new Error('nenhum horário do dia lança na direção que a base permite'), { code: 'azimuth' })
+}
+
+/* Card C19: para cada base, se ela alcança a órbita da missão na landingWindow, lançando na direção
+   que permite. É só a geometria do lançamento, sem mirar a travessia: serve para a tela marcar as
+   bases, e a missão de verdade ainda pode não fechar (designMission). O local de pouso não entra:
+   o plano do lançamento só depende da Lua na chegada.
+   launchSites: as bases, cada uma com id, lat, lon e azimuthLimits (ou null). Devolve
+   { [id]: 'ok' | 'blocked' | 'unchecked' }: 'unchecked' é a base sem faixa conferida. */
+export function launchReach({ launchSites, landingWindow }, parameters = MISSION) {
+  const clock = missionClock(landingWindow, parameters)
+  const ephemeris = createEphemeris(clock.arrivalMs - DAY_MS, clock.arrivalMs + DAY_MS)
+  const moonDirection = unit(ephemeris.moon(clock.arrivalMs).positionKm)
+  return Object.fromEntries(
+    launchSites.map((site) => {
+      if (!site.azimuthLimits) return [site.id, 'unchecked']
+      const { candidates } = launchCandidates(site, moonDirection, clock.nominalLaunchMs)
+      return [site.id, candidates.length > 0 ? 'ok' : 'blocked']
+    }),
+  )
+}
+
+/* launchSite e landingSite: { lat, lon } em graus (a base na Terra e o local na Lua).
+   landingWindow: a janela de pouso, { startUtc, endUtc }, como vem em sky.landingWindows.
+   launchSite.azimuthLimits: a faixa de azimutes que a base permite, ou null (card C19).
+   parameters: os números da missão (MISSION, no config.js); só os testes trocam.
+
+   Devolve a missão no referencial do motor: os instantes em milissegundos UTC, os estados
+   { dateMs, positionKm, velocityKmS } de cada evento, os números e o caminho de cada trecho
+   integrado (paths). Lança um erro quando não há caminho: a tela mostra que não achou. */
+export function designMission({ launchSite, landingSite, landingWindow }, parameters = MISSION) {
+  const {
+    landingAimMs, parkingKm, parkingSpeed, parkingRate, ascentMs, lunarKm, lowPointKm, descentMs, poweredMs, stayMs, crossingMs,
+    arrivalMs, nominalLaunchMs,
+  } = missionClock(landingWindow, parameters)
+  const ascentArc = parameters.ascentArcDeg * DEG
+  const lunarRate = Math.sqrt(GM_KM3_S2.moon / lunarKm ** 3)
+  const poweredArc = parameters.poweredDescentArcDeg * DEG
+
+  // o local de pouso e o polo norte da Lua no espaço, no instante do pouso
+  const toEquatorial = moonToEquatorial(landingAimMs)
+  const landingSiteDirection = toEquatorial(latLonToUnit(landingSite.lat, landingSite.lon))
+  const moonPole = toEquatorial([0, 0, 1])
+
+  const ephemeris = createEphemeris(arrivalMs - crossingMs - 3 * DAY_MS, landingAimMs + DAY_MS)
+  const moonAtArrivalKm = ephemeris.moon(arrivalMs).positionKm
+  const moonDirection = unit(moonAtArrivalKm)
+
+  // o lançamento: os horários do dia em que a base lança na direção que permite (launchCandidates)
+  const limits = launchSite.azimuthLimits ?? null
+  const { candidates: first, earthPole, padDirection, planeNormal } = launchCandidates(launchSite, moonDirection, nominalLaunchMs)
+  if (first.length === 0) {
+    if (limits) throw azimuthError()
+    throw new Error('nenhum horário de lançamento encontrado para a base')
+  }
 
   let failure = null
-  for (const candidate of ordered) {
-    try {
-      return aimFrom(candidate.launchMs)
-    } catch (error) {
-      failure = error
+  // sem faixa, uma busca só; com faixa, uma por folga, até a mira sair dentro dela
+  for (const marginDeg of limits ? AZIMUTH_MARGINS_DEG : [AZIMUTH_MARGINS_DEG[0]]) {
+    const ordered = marginDeg === AZIMUTH_MARGINS_DEG[0] ? first : launchCandidates(launchSite, moonDirection, nominalLaunchMs, marginDeg).candidates
+    for (const candidate of ordered) {
+      try {
+        const design = aimFrom(candidate.launchMs)
+        // a mira gira o plano em volta da base depois da busca: confere de novo, sem a folga
+        if (allowsAzimuth(limits, design.launchAzimuthDeg)) return design
+        failure = azimuthError()
+      } catch (error) {
+        failure = error
+      }
     }
   }
   throw failure
@@ -370,9 +467,6 @@ export function designMission({ launchSite, landingSite, landingWindow }, parame
     paths.descent.push(afterDoi)
     const lowPoint = propagate(afterDoi, doiMs + descentMs, { ...options, onStep: (state) => paths.descent.push(state) })
 
-    const east = unit(cross(earthPole, pad))
-    const heading = cross(normal, pad)
-    const azimuth = Math.atan2(dot(heading, east), dot(heading, cross(pad, east))) / DEG
     const lunarNormal = unit(cross(pass.fromMoonKm, pass.fromMoonKmS))
     return {
       launchMs,
@@ -383,7 +477,7 @@ export function designMission({ launchSite, landingSite, landingWindow }, parame
       lunarNormal,
       landingSiteDirection,
       insertion, beforeTli, tli, pass, afterLoi, beforeDoi, afterDoi, lowPoint,
-      launchAzimuthDeg: azimuth < 0 ? azimuth + 360 : azimuth,
+      launchAzimuthDeg: launchAzimuthDeg(pad, normal, earthPole),
       parkingInclinationDeg: angleBetween(normal, earthPole) / DEG,
       lunarInclinationDeg: angleBetween(lunarNormal, moonPole) / DEG,
       tliDeltaVKmS: norm(tli.velocityKmS) - norm(beforeTli.velocityKmS),
