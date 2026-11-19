@@ -74,9 +74,15 @@ installs everything on Windows, from scratch.
   clock, and 15 launch pads marked on the Earth at their real latitude and longitude
   (`src/data/launchSites.js`, with the coordinates from GCAT). The engine puts each pad in space
   at the clock's instant (`src/engine/earthSite.js`, checked against JPL Horizons). A launch
-  site is chosen by clicking its mark or in the list, which also turns the camera to it. It is
-  where the mission simulation will be drawn (cards C14 to C16); the path of a mission is not
-  there yet.
+  site is chosen by clicking its mark or in the list, which also turns the camera to it.
+- The mission simulation, in the same view (card C16): with a landing site chosen on the Moon
+  and a launch site chosen on the Earth, the list of the site's landing windows and the path of
+  the reference mission to it, from the pad, around the Earth, across to the Moon, around it and
+  down to the site. The line is solid where it is computed and dashed where it is drawn. A dot is
+  the spacecraft at the time of the view's clock, which then covers the mission, from the launch
+  to the landing; a camera button follows the spacecraft; and the numbers of the mission are
+  listed: the launch time and direction, the three burns, the crossing and the landing time. The
+  texts say what is real, what is drawn and which numbers are choices of the model.
 - The orbit propagator of the engine (`src/engine/orbit.js`, card C14): given a position, a speed
   and an instant, where a spacecraft is later, under the gravity of the Earth, the Moon and the
   Sun, each in its real position. Checked against the flown path of Artemis I, from JPL Horizons:
@@ -86,8 +92,7 @@ installs everything on Windows, from scratch.
   landing site and one of its landing windows, when to launch and in which direction, the three
   burns and the path, phase by phase, found by aiming with the propagator. `useMission`
   (`src/hooks/useMission.js`) delivers it to the screen from a Worker. The numbers of the mission
-  (`MISSION`, in `src/engine/config.js`) are provisional, and nothing on screen draws it yet
-  (card C16).
+  (`MISSION`, in `src/engine/config.js`) are provisional.
 - In the panel, the list of landing sites, which also chooses the site, including by keyboard
   alone (card I2): the IM-2 landing and the center of 7 of the 9 Artemis III candidate regions
   (card E16). Also in the panel, the date and time in UTC, which start at the time the page was
@@ -403,6 +408,7 @@ umbraview/
 │   │   ├── ViewClock.css
 │   │   ├── ViewClock.jsx            the row of controls of those two views: play, the clock cursor and the hour
 │   │   ├── cssToken.js              the value of a token of tokens.css, for the colors the 3D drawing needs
+│   │   ├── missionPath.js           the path of the mission for the drawing: the spacecraft at an instant, the events and the camera that follows it (card C16)
 │   │   ├── missionPicking.js        the click on the mark of a launch site: which site it chooses
 │   │   ├── missionScale.js          the scale of the mission view, and where and how big the mark of a launch site is
 │   │   ├── useBodyTexture.js        the image of a body becoming a texture, for the Earth and the Moon

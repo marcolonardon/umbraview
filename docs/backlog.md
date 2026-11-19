@@ -2089,8 +2089,9 @@ the new format; and `verify` passes.
 
 ### C16 · The mission on screen: the path, the clock and the numbers
 
-**Status:** proposed on 17/11; waits for Enzo's OK · **Depends on:** C13 (the view) and C15 (the
-bridge)
+**Status:** built on 18/11, on the branch `feat/c16-missao-na-tela` of Marco's fork
+(`marcolonardon/umbraview`), born from the branch of card C15; it waits for Marco's check in the
+browser, for Enzo's OK and for the PR number · **Depends on:** C13 (the view) and C15 (the bridge)
 
 **What it is for.** Show the mission of card C15 in the view of card C13.
 
@@ -2122,6 +2123,100 @@ the calculation date.
 the clock moves the spacecraft from the pad to the landing; everything works with the keyboard
 alone; Marco has checked it in the browser before the commit; the README's "What already exists"
 tells about the view; and `verify` passes.
+
+**How it turned out.**
+- **What the person sees.** In the Mission view, with a landing site chosen on the Moon (in the
+  list of the panel, or by clicking the Moon in the Moon view) and a launch site chosen on the
+  Earth: the list of the site's landing windows, the line of the mission, the spacecraft as a
+  dot, the names of four events (the launch, leaving the Earth, arriving at the Moon and the
+  landing) and the numbers of the mission.
+- **The landing site and its windows are the ones the panel already has.** `App.jsx` gives the
+  view the chosen point and its `sky.landingWindows`; the view does not calculate them again.
+- **The first window comes already chosen.** The card said "choosing both"; with the first one
+  chosen, the mission appears as soon as there is a site and a launch site, and the state "no
+  window chosen" does not exist. The person changes the window in the list. The chosen window is
+  kept in `App.jsx`, like the launch site, so it survives a change of view; if it no longer
+  exists (the date changed), the first one is used.
+- **The clock covers the mission.** Without a mission it is the clock of card C13: the period,
+  from the chosen date, hour by hour. With a mission it goes from the launch to the landing, in
+  steps of 6 minutes (the climb takes 10, and the wait in the parking orbit can take less), at 2
+  hours per second when playing: the whole mission in under a minute. When the mission arrives or
+  changes, the clock goes back to its start, stopped (`resetKey`, in `useViewClock`). The Earth,
+  the Moon and the spacecraft are drawn at the clock's instant, and the calculation date does not
+  change.
+- **The lines.** The stretches counted from the Earth stay still in the drawing, with the Earth
+  turning under them; the ones counted from the Moon are in a group tied to the Moon's position at
+  the clock's instant. The computed stretches are a solid line and the two drawn ones (the climb
+  and the final descent) are dashed, in the accent color.
+- **The spacecraft** is a dot that keeps the same size on screen, from close up and with the whole
+  orbit in view. The names of the events disappear from far away, where they would sit on top of
+  each other and of the names of the Earth and the Moon.
+- **The camera.** A fourth button, Spacecraft, exists only with a mission on screen, and the
+  camera goes along with the spacecraft. When the mission arrives, the camera turns to the launch
+  site again: the clock jumps to the launch, days earlier, and the site is somewhere else.
+- **A defect found in the browser, and fixed:** with the camera on the spacecraft in the parking
+  orbit, 185 km up, the camera could end up inside the Earth, and the screen went all blue. Near
+  the Earth and the Moon the camera now keeps farther from the spacecraft, enough to stay outside
+  the body from any side (`craftCamera`, in `src/scene/missionPath.js`, with its test).
+- **One text for each state**, in `src/data/missionView.js`, in a place the screen reader
+  announces (`role="status"`): no landing site; the windows being calculated; the windows that
+  could not be calculated; no window in the period; the mission being calculated; no path found;
+  and the mission, saying from where to where. With no launch site, the note of card C13 asks for
+  one.
+- **What is real and what is not** is said in four notes, from the plan's "What real means here":
+  that it is a reference mission and not the flight plan of a mission that flew; what is computed
+  and what is drawn; what was left out of the physics; and which heights and times are choices of
+  the model, read from `MISSION` and called provisional.
+- **New in the code:** `src/scene/missionPath.js` (the spacecraft at an instant, the events, the
+  points for the lines and the camera limit), `stepHours` in `ViewClock.jsx` and `resetKey` in
+  `useViewClock.js`. `MissionView.jsx` has no orbit calculation: the mission comes from
+  `useMission`.
+- **Known rough edges.** While a new mission is calculated (about a tenth of a second), the clock
+  goes back to the period, so the Earth jumps twice when the launch site or the window changes.
+  The arrival and the landing happen close to each other, near the pole, and their names almost
+  touch. A name is not hidden when its point goes behind the Earth or the Moon. The stay in lunar
+  orbit of 12.5 hours is shown as "13 h". The camera cannot be turned with the keyboard, as in the
+  other views.
+
+**Verified** on 18/11/2026, with `npm run dev` in the app's browser pane (Chromium), at 1500 × 950:
+- With the IM-2 landing site and Kennedy LC-39A: the list shows the two landing windows the panel
+  shows, which came from the real `sky.landingWindows`; the status goes from "Calculating the
+  mission…" to "Reference mission from Kennedy Space Center, LC-39A to Athena (IM-2)."; the
+  camera turns to Florida at the time of the launch, and the line leaves from the mark of the pad.
+- The numbers of that mission: launch on 14/11/2026 at 18:04 UTC heading 89°, 3.14 km/s to leave
+  the Earth, a crossing of 4 d 3 h, 0.85 km/s to enter lunar orbit, 19 m/s to leave it, and the
+  landing on 19/11 at 11:52 UTC, 12 hours after the window opened.
+- With the whole orbit in view, at 15, 50 and 95 hours of the clock the spacecraft is farther
+  along the line each time, and the Moon moves along its orbit to the end of the line. The phase
+  shown goes from the climb to the parking orbit, the crossing, the lunar orbit and the final
+  descent.
+- With the camera on the Moon: the lunar orbit is a ring over the poles, and at the last step of
+  the clock the spacecraft is on the ground near the south pole.
+- With the camera on the spacecraft: before the fix, the all-blue screen in the parking orbit;
+  after it, the spacecraft just after leaving the Earth, with the Earth behind it.
+- Play moved the clock and Pause stopped it; the clock starts stopped.
+- With the keyboard: with the focus on the clock's cursor, five presses of the right arrow moved
+  it 30 minutes. The two lists are ordinary `<select>` elements and the camera buttons are
+  ordinary buttons.
+- Changing the launch site to Alcântara and to Mahia, and the window to the one of December, gave
+  a new mission each time; going to the Moon view and back kept the launch site and the window.
+- The console had no error in a fresh run of all of this. One React error ("Attempted to
+  synchronously unmount a root") appeared only while files were being hot-reloaded during
+  development.
+- Test first: before the code, the 17 new tests of the view failed, the 10 of `missionPath.js`
+  failed against an empty skeleton, the one of the clock's `resetKey` failed, and the 4 of the
+  camera limit failed.
+- Faults planted, each failing its own tests: staying in the previous stretch at a seam; not
+  using the first window; the clock not going back when the mission arrives; the camera staying
+  on the spacecraft with no mission; the mission's clock starting at the chosen date; the cursor
+  ignoring its step; and the camera limit without the Earth's clearance. An eighth one passed
+  (using the windows left from before while the sky is recalculated), and it got a test, which
+  fails with the fault.
+- `npm run verify` passes, with 838 tests in 65 files and no lint warning. The production build now carries the Worker of the
+  mission.
+- Not verified: Marco's own check in the browser, which the card asks for before the commit; the
+  request for less motion; a touch screen; a browser other than Chromium; the production build
+  opened in a browser; and the time on Miguel's laptop.
 
 ---
 
