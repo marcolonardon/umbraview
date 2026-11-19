@@ -2937,6 +2937,37 @@ parts of the menus, and should be possible to hide").
   the map shown or hidden. So the map is not what costs; it moves at the frame rate of the whole
   view, and on a slower machine the 3D drawing is the likely cost. Not verified: Marco's machine,
   where he saw it.
+
+**The flight panel in broadcast style, part 1 of 3, at Marco's request on 19/11** ("a nicer UI,
+inspired by the UI SpaceX uses in its launch broadcasts"; he chose to do the flight panel first and
+look at it before the map and the planning panel). No mark, logo or font of SpaceX was copied; the
+font is still Fira Sans.
+- **A band under the scene** (`MissionHud`, in `src/scene/MissionFlight.jsx`), darker toward the
+  bottom (`--hud-shade`), in place of the flight card and of the straight track under the scene.
+- **In the middle, an arc** (`arcPoint` and `arcPath`, in `src/scene/missionHud.js`) with a dot per
+  phase, the names in capitals above and below it in turn, the flown part lit, and the time of the
+  mission large under it, with the landing site and the launch site. Over the arc lies an ordinary
+  range control with no look of its own: it is what takes the mouse, the arrow keys and the screen
+  reader, and the x of the arc moves evenly with the place on the track, so the two point at the
+  same place.
+- **On the left, two round gauges**, velocity and altitude, with the numbers of the flight card. In
+  the drawn stretches they show "—". The scale of each one follows the value (`gaugeScale`): the
+  first step of 1, 2 or 5 times a power of ten that is not below it, written under the number
+  ("0–200"). The first version used the highest value of the mission as the scale, and the altitude
+  of the parking orbit (185 of 380 thousand km) lit nothing until near the Moon (Marco, 19/11).
+- **The flown part of the arc is the same arc, lit by its dash** (`pathLength` and `stroke-dasharray`),
+  and the gauges have no transition. The first version rebuilt the path of the flown part at every
+  frame, in straight pieces, and gave each gauge a transition that restarted at every frame: Marco
+  saw both stuttering.
+- **On the right, the phase in capitals** and one sentence on what it is (`phaseNotes`, in
+  `src/data/missionView.js`), and the buttons to play, of the speed and of the free camera.
+- The flight card is still there for the screen reader, with the same name and text; on screen only
+  its time is shown. The badge "Reference mission" and the landing summary rise above the band.
+- At 900 px wide or less the band takes two rows; on a phone it goes under the scene.
+- Seen in the app's browser pane (Chromium) at 1440 × 900 and 375 × 812, with the boxes measured: the
+  band 1392 × 188 px over the bottom of the scene, clear of the map and of the badge; on the phone,
+  under the scene, with no side scroll. `npm run verify` passes, with 1020 tests. Not verified: a real
+  screen reader, a touch screen, and Marco's opinion of the look.
 - Only launches toward the east half (0° to 180°) are possible: the engine always takes the plane
   that turns with the Earth. A site that only launches to the west (none of the 15, as far as we
   know; not checked) would be "Can't reach this orbit" in every window.
