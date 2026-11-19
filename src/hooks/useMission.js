@@ -20,15 +20,19 @@ function workerOfPage() {
 const IDLE = Object.freeze({ status: 'idle', mission: null })
 const LOADING = Object.freeze({ status: 'loading', mission: null })
 const ERROR = Object.freeze({ status: 'error', mission: null })
+// a base não lança na direção que a órbita pede (card C19): a tela diz isso, e não "nenhum caminho"
+const AZIMUTH_ERROR = Object.freeze({ status: 'error', mission: null, reason: 'azimuth' })
 
-/* launchSite: a base na Terra, { lat, lon } em graus. landingSite: o local na Lua, { lat, lon }.
+/* launchSite: a base na Terra, { lat, lon } em graus, e azimuthLimits, a faixa de azimutes que ela
+   permite, ou null (card C19). landingSite: o local na Lua, { lat, lon }.
    landingWindow: uma janela de sky.landingWindows, { startUtc, endUtc }. Qualquer um pode ser null
    enquanto não foi escolhido. createWorker: quem cria o Worker; só os testes trocam, e precisa ser
    sempre a mesma função, porque está nas dependências do efeito.
 
    Devolve { status, mission }: status é 'idle' (falta escolher algo), 'loading', 'ready' ou
    'error' (nenhum caminho foi achado, ou a conta falhou); mission, no 'ready', é o resultado do
-   computeMission (src/engine/mission.js) mais elapsedMs, quanto a conta levou. */
+   computeMission (src/engine/mission.js) mais elapsedMs, quanto a conta levou. Quando quem barrou
+   foi a direção do lançamento, o 'error' vem com reason: 'azimuth' (card C19). */
 export function useMission(launchSite, landingSite, landingWindow, createWorker = workerOfPage) {
   const launchLat = launchSite?.lat
   const launchLon = launchSite?.lon
@@ -36,9 +40,13 @@ export function useMission(launchSite, landingSite, landingWindow, createWorker 
   const landingLon = landingSite?.lon
   const startMs = landingWindow?.startUtc.getTime()
   const endMs = landingWindow?.endUtc.getTime()
+  // a faixa vira texto: a mesma faixa num objeto novo não refaz a conta
+  const limits = JSON.stringify(launchSite?.azimuthLimits ?? null)
   // o pedido é feito de números: um objeto novo com os mesmos valores não refaz a conta
   const request =
-    launchSite && landingSite && landingWindow ? `${launchLat} ${launchLon} ${landingLat} ${landingLon} ${startMs} ${endMs}` : null
+    launchSite && landingSite && landingWindow
+      ? `${launchLat} ${launchLon} ${limits} ${landingLat} ${landingLon} ${startMs} ${endMs}`
+      : null
   const [done, setDone] = useState({ request: null, result: IDLE })
   const worker = useRef(null)
   const lastId = useRef(0)
@@ -71,7 +79,7 @@ export function useMission(launchSite, landingSite, landingWindow, createWorker 
       if (data.error) {
         // a tela recebe só o status; o motivo (a mira não fechou, a travessia não cabe...) vai para o console
         console.error('useMission: a conta da missão falhou', data.error)
-        setDone({ request, result: ERROR })
+        setDone({ request, result: data.code === 'azimuth' ? AZIMUTH_ERROR : ERROR })
       } else {
         setDone({ request, result: { status: 'ready', mission: { ...data.mission, elapsedMs: data.elapsedMs } } })
       }
@@ -79,7 +87,7 @@ export function useMission(launchSite, landingSite, landingWindow, createWorker 
     active.addEventListener('message', onMessage)
     active.postMessage({
       id,
-      launchSite: { lat: launchLat, lon: launchLon },
+      launchSite: { lat: launchLat, lon: launchLon, azimuthLimits: JSON.parse(limits) },
       landingSite: { lat: landingLat, lon: landingLon },
       landingWindow: { startUtc: new Date(startMs), endUtc: new Date(endMs) },
     })
@@ -87,7 +95,7 @@ export function useMission(launchSite, landingSite, landingWindow, createWorker 
       current = false
       active.removeEventListener('message', onMessage)
     }
-  }, [request, launchLat, launchLon, landingLat, landingLon, startMs, endMs, createWorker])
+  }, [request, launchLat, launchLon, limits, landingLat, landingLon, startMs, endMs, createWorker])
 
   if (request === null) return IDLE
   return done.request === request ? done.result : LOADING

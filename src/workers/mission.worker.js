@@ -4,7 +4,8 @@
  *
  * A página manda { id, launchSite, landingSite, landingWindow }: o número do pedido, a base e o
  * local de pouso ({ lat, lon } em graus) e a janela de pouso ({ startUtc, endUtc }, dois Date). A
- * resposta é { id, mission, elapsedMs } ou { id, error }: error quando nenhum caminho foi achado.
+ * resposta é { id, mission, elapsedMs } ou { id, error, code }: error quando nenhum caminho foi
+ * achado, e code 'azimuth' quando foi a direção do lançamento que barrou (card C19).
  */
 import { computeMission } from '../engine/mission.js'
 
@@ -17,6 +18,6 @@ self.onmessage = ({ data: { id, launchSite, landingSite, landingWindow } }) => {
     const buffers = mission.segments.flatMap((segment) => [segment.timesMs.buffer, segment.positionsKm.buffer])
     self.postMessage({ id, mission, elapsedMs }, buffers)
   } catch (error) {
-    self.postMessage({ id, error: String(error) })
+    self.postMessage({ id, error: String(error), code: error.code ?? null })
   }
 }

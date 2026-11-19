@@ -44,7 +44,8 @@ describe('useMission', () => {
     // o pedido leva só os números: o Worker não recebe nome nem o resto da janela
     expect(worker.pedidos[0]).toEqual({
       id: worker.pedidos[0].id,
-      launchSite: { lat: KENNEDY.lat, lon: KENNEDY.lon },
+      // sem faixa de azimutes conferida, ela vai como null (card C19)
+      launchSite: { lat: KENNEDY.lat, lon: KENNEDY.lon, azimuthLimits: null },
       landingSite: { lat: IM2.lat, lon: IM2.lon },
       landingWindow: { startUtc: JANELA.startUtc, endUtc: JANELA.endUtc },
     })
@@ -117,5 +118,29 @@ describe('useMission', () => {
     expect(result.current).toEqual({ status: 'idle', mission: null })
     unmount()
     expect(worker.terminate).toHaveBeenCalled()
+  })
+
+  /* Card C19: a faixa de azimutes da base vai junto para a conta, e quando é ela que barra a
+     missão a tela fica sabendo o motivo, para dizer qual é. */
+  it('a faixa de azimutes da base vai no pedido, e trocar só a faixa refaz a conta', async () => {
+    const { worker, criar } = fabrica()
+    const faixa = [{ minDeg: 35, maxDeg: 120 }]
+    const { rerender } = renderHook(({ base }) => useMission(base, IM2, JANELA, criar), {
+      initialProps: { base: { ...KENNEDY, azimuthLimits: faixa } },
+    })
+    await waitFor(() => expect(worker.pedidos).toHaveLength(1))
+    expect(worker.pedidos[0].launchSite.azimuthLimits).toEqual(faixa)
+    rerender({ base: { ...KENNEDY, azimuthLimits: [{ minDeg: 140, maxDeg: 170 }] } })
+    await waitFor(() => expect(worker.pedidos).toHaveLength(2))
+  })
+
+  it('quando a direção do lançamento barra a missão, o erro diz o motivo', async () => {
+    const erro = vi.spyOn(console, 'error').mockImplementation(() => {})
+    const { worker, criar } = fabrica()
+    const { result } = renderHook(() => useMission(KENNEDY, IM2, JANELA, criar))
+    await waitFor(() => expect(worker.pedidos).toHaveLength(1))
+    act(() => worker.responde({ id: worker.pedidos[0].id, error: 'Error: nenhum horário', code: 'azimuth' }))
+    expect(result.current).toEqual({ status: 'error', mission: null, reason: 'azimuth' })
+    erro.mockRestore()
   })
 })
