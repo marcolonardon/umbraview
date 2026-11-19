@@ -23,16 +23,18 @@ import { useLayoutEffect, useMemo, useRef, useState } from 'react'
 import { Matrix4 } from 'three'
 
 import { missionView } from '../data/missionView.js'
-import { MISSION, PERIOD_DAYS } from '../engine/config.js'
+import { MIN_LANDING_WINDOW_HOURS, MISSION, PERIOD_DAYS } from '../engine/config.js'
 import { EARTH_EQUATORIAL_RADIUS_KM, EARTH_SIDEREAL_DAY_HOURS, earthSiteKm } from '../engine/earthSite.js'
 import { ECLIPTIC_SKY_MATRIX, moonOrbitPath, systemStateAt } from '../engine/system.js'
 import { useKeepFocus } from '../hooks/useKeepFocus.js'
+import { useLandingAreas } from '../hooks/useLandingAreas.js'
 import { useMission } from '../hooks/useMission.js'
 import { usePrefersReducedMotion } from '../hooks/usePrefersReducedMotion.js'
 import { useViewClock } from '../hooks/useViewClock.js'
 import { formatDuration, formatUtc, formatUtcDate } from '../panel/format.js'
 import { token } from './cssToken.js'
 import { EarthBody } from './EarthBody.jsx'
+import { LandingAreasLayer } from './LandingAreasLayer.jsx'
 import { sunSideStart } from './framing.js'
 import { LAUNCH_STEP, MissionControl } from './MissionControl.jsx'
 import { MissionComplete, MissionTelemetry, MissionTrack, TRACK_STEPS } from './MissionFlight.jsx'
@@ -276,16 +278,21 @@ function PathLine({ line, flown }) {
    marcas das bases crescem. Voando, só a base escolhida aparece, e a cena não escolhe nada.
    flown: voando, quantos pontos de cada trecho a nave já voou, por fase; planejando, null.
    craftTick: o passo do trilho em que a missão está; é o que faz a câmera da nave acompanhá-la.
-   freeCamera: a pessoa soltou a câmera; ela vai junto com a nave, mas não se põe sozinha. */
+   freeCamera: a pessoa soltou a câmera; ela vai junto com a nave, mas não se põe sozinha.
+   landingAreas: o mapa de onde dá para pousar (o areas do useLandingAreas), ou null desligado
+   (card C18). */
 function MissionBodies({
   state, orbit, sites, markers, selectedIndex, faceSelected, onPick, dateUtc, reducedMotion, cameraView, labels, path, craft, missionKey,
-  landingSite, onPickLanding, launchKey, upcoming, knownSites, step, flown, craftTick, freeCamera,
+  landingSite, onPickLanding, launchKey, upcoming, knownSites, step, flown, craftTick, freeCamera, landingAreas,
 }) {
   const planning = step !== null
   // a largura da cena sobre a altura dela: numa cena em pé, a câmera do passo do pouso começa mais alta
   const aspect = useThree((three) => three.size.width / three.size.height)
-  // no passo do pouso, a câmera da Lua começa em cima do polo sul, de perto, onde estão os locais conhecidos
-  const poleView = cameraView === 'moon' && step === 0
+  /* No passo do pouso, a câmera da Lua começa em cima do polo sul, de perto, onde estão os locais
+     conhecidos. No da janela também, quando a câmera está na Lua (card C18): é onde estão o ponto
+     escolhido e o mapa de onde dá para pousar, e sair dali para a Lua inteira afastava os dois. */
+  const moonStep = step === 0 || step === 1
+  const poleView = cameraView === 'moon' && moonStep
   // voando em volta da Lua, a câmera olha a Lua de um lugar parado, e não a nave
   const atMoon = cameraView === 'craft' && Boolean(craft) && watchesMoon(craft.phase)
   const [hoveredPad, setHoveredPad] = useState(-1)
@@ -346,8 +353,8 @@ function MissionBodies({
   /* No passo do pouso, a câmera da Lua vai para cima do polo sul, de perto (landingViewDirection).
      Só a entrada no passo move a câmera: depois quem manda é a pessoa. */
   const moonFacing = useMemo(
-    () => (step === 0 ? { key: 'landing', direction: landingViewDirection(state.moonMatrix, state.sunDirection) } : null),
-    [step, state],
+    () => (moonStep ? { key: 'landing', direction: landingViewDirection(state.moonMatrix, state.sunDirection) } : null),
+    [moonStep, state],
   )
   // no passo do pouso o eixo de giro dos controles se deita, para o polo não ficar em cima dele
   const landingUp = useMemo(() => landingViewUp(state.moonMatrix, state.sunDirection), [state])
@@ -529,9 +536,12 @@ function MissionBodies({
         onPointerOver={planning ? handleMoonOver : undefined}
         onPointerOut={planning ? handleSiteOut : undefined}
         // no passo do pouso a câmera olha o polo, e a linha do eixo atravessaria os pinos
-        showAxis={planning && step !== 0}
+        showAxis={planning && !moonStep}
         relief
       />
+      {/* As manchas de onde dá para pousar: o mesmo mapa da vista da Lua, nos mesmos uniformes, que
+          o material da Lua daqui também lê (MoonBody.jsx). */}
+      <LandingAreasLayer areas={landingAreas} color={token('--color-success')} />
       {step === 0 && <SitePins sites={knownSites} positions={pinPositions} onPick={onPickLanding} labels={labels} />}
       {landingMarker && <ScreenDot position={landingMarker} color="--color-accent" size={SELECTED_PIN_SIZE} rimmed />}
       {/* voando, o nome do pouso já está lá, no fim da linha */}
@@ -585,6 +595,21 @@ function MissionBodies({
   )
 }
 
+/* O aviso do passo da janela quando o período não tem nenhuma (card C18), pelo que a busca
+   adiante achou: a próxima janela, o lado oculto ou nada em um ano. Sem a busca (nextWindow null),
+   o aviso antigo, que manda trocar a data ou o local. */
+function noWindowNotice(nextWindow, dateUtc) {
+  if (!nextWindow) return missionView.noWindows(PERIOD_DAYS)
+  const { landingWindow: next, earthEverAboveHorizon, searchedUntilUtc } = nextWindow
+  if (next) {
+    // o "≥" na janela que passa do fim do período dela, como nos cartões (MissionControl.jsx)
+    const duration = `${next.startsBeforePeriod || next.endsAfterPeriod ? '≥ ' : ''}${formatDuration(next.durationHours)}`
+    return missionView.nextWindow(PERIOD_DAYS, formatUtcDate(dateUtc), formatUtc(next.startUtc), duration)
+  }
+  if (!earthEverAboveHorizon) return missionView.farSide
+  return missionView.noWindowUntil(formatUtcDate(searchedUntilUtc), MIN_LANDING_WINDOW_HOURS)
+}
+
 /* dateUtc: a data escolhida (um Date); sem missão, o relógio da vista começa nela. launchSites: as
    bases (src/data/launchSites.js). launchSiteId: o id da base escolhida, ou null.
    onLaunchSiteChange: chamada com o id quando a pessoa escolhe uma base na lista.
@@ -597,11 +622,17 @@ function MissionBodies({
    onLandingSiteChange: chamada com o local escolhido, da lista ou do clique na Lua (card C17).
    onDateChange: chamada com a data que a pessoa escolhe no passo da janela; é a data da tela
    inteira, de onde as janelas de pouso são procuradas.
+   nextWindow: sem janela no período, o que a busca adiante achou (sky.nextWindow, card C18), ou null.
+   startStep: o passo em que o painel abre, ou null para o primeiro que falta; o App manda 1 quando
+   a pessoa vem da vista da Lua com o ponto escolhido (card C18).
+   showLandingAreas e onToggleLandingAreas: o mapa de onde dá para pousar, o mesmo estado do mapa da
+   vista da Lua (card C18).
    Quem guarda as escolhas é o App.jsx, para elas não se perderem quando a pessoa troca de vista. */
 export function MissionView({
   dateUtc, launchSites, launchSiteId, onLaunchSiteChange,
   landingSite = null, skyStatus = 'idle', landingWindows = null, landingWindowStartMs = null, onLandingWindowChange,
   sites = [], onLandingSiteChange = () => {}, onDateChange = () => {},
+  nextWindow = null, startStep = null, showLandingAreas = false, onToggleLandingAreas = () => {},
 }) {
   const selectedIndex = launchSites.findIndex((site) => site.id === launchSiteId)
   const launchSite = launchSites[selectedIndex] ?? null
@@ -630,12 +661,15 @@ export function MissionView({
   const focusTarget = useRef(null)
   /* O passo aberto no painel: o que a pessoa reabriu clicando na etiqueta, ou, sem isso, o primeiro
      que falta fazer; com os três feitos, o do lançamento. */
-  const [chosenStep, setChosenStep] = useState(null)
+  const [chosenStep, setChosenStep] = useState(startStep)
   const firstUndone = [landingSite, landingWindow, launchSite].findIndex((choice) => !choice)
   const openStep = chosenStep ?? (firstUndone === -1 ? LAUNCH_STEP : firstUndone)
   /* A câmera vai aonde se escolhe: à Lua no passo do pouso, à Terra no da base. Começa assim, e
      acompanha a troca de passo (vista durante o render, como a troca do relógio no useViewClock). */
-  const cameraOfStep = (step) => (step === 0 ? 'moon' : step === 2 ? 'earth' : null)
+  /* No passo da janela também é a Lua (card C18): é lá que estão o ponto escolhido e o mapa de onde
+     dá para pousar. Antes a câmera ficava onde estava, e quem reabria a janela vindo do passo da
+     base ligava o mapa olhando para a Terra. */
+  const cameraOfStep = (step) => (step === 0 || step === 1 ? 'moon' : step === 2 ? 'earth' : null)
   const [chosenCameraView, setCameraView] = useState(() => cameraOfStep(openStep) ?? 'earth')
   const [stepOfCamera, setStepOfCamera] = useState(openStep)
   if (stepOfCamera !== openStep) {
@@ -701,11 +735,12 @@ export function MissionView({
   /* O aviso do cartão do painel: o que impede o passo aberto de andar, ou em que pé a conta está.
      No passo da janela, o que houve com as janelas do local; no do lançamento, a conta da missão.
      Nos outros dois a pergunta do passo já diz o que fazer. */
+  const noWindow = skyStatus === 'ready' && windows.length === 0
   const windowNotice =
     !landingSite ? missionView.windowWaiting
     : skyStatus === 'loading' ? missionView.windowsLoading
     : skyStatus === 'error' ? missionView.windowsError
-    : skyStatus === 'ready' && windows.length === 0 ? missionView.noWindows(PERIOD_DAYS)
+    : noWindow ? noWindowNotice(nextWindow, dateUtc)
     : ''
   const launchNotice =
     missionStatus === 'loading' ? missionView.missionLoading
@@ -713,6 +748,25 @@ export function MissionView({
     : mission ? missionView.missionReady
     : ''
   const notice = openStep === 1 ? windowNotice : openStep === LAUNCH_STEP ? launchNotice : ''
+
+  /* Sem janela no período e com uma achada adiante, o botão leva a busca para o período dela. Fica
+     no passo da janela, como quem troca a data à mão: a janela nova aparece nos cartões antes de
+     o painel seguir para a base. */
+  const goToNextWindow = noWindow && nextWindow?.landingWindow
+    ? () => {
+        setChosenStep(1)
+        onDateChange(nextWindow.periodStartUtc)
+      }
+    : null
+
+  /* O mapa de onde dá para pousar (card C18). Só planejando: voando, as manchas seriam ruído em
+     volta da linha da missão, e a conta não roda. */
+  const landing = useLandingAreas(dateUtc, showLandingAreas && !flying)
+  const landingAreasText =
+    !showLandingAreas ? ''
+    : landing.status === 'error' ? missionView.landingAreasError
+    : landing.status === 'ready' ? missionView.landingAreasReady(PERIOD_DAYS, MIN_LANDING_WINDOW_HOURS)
+    : missionView.landingAreasLoading
 
   /* Escolher fecha o passo que estava reaberto: o painel segue para o próximo que falta. */
   const chooseLandingSite = (site) => {
@@ -801,6 +855,7 @@ export function MissionView({
                 launchKey={launchCount}
                 craftTick={Math.round(clock.hour)}
                 freeCamera={freeCamera}
+                landingAreas={flying ? null : landing.areas}
               />
             </Canvas>
             <div className="system-view__labels" ref={labels} />
@@ -830,6 +885,10 @@ export function MissionView({
                 onLandingWindowChange(startMs)
               }}
               dateUtc={dateUtc}
+              onUseNextWindow={goToNextWindow}
+              showLandingAreas={showLandingAreas}
+              onToggleLandingAreas={onToggleLandingAreas}
+              landingAreasText={landingAreasText}
               onDateChange={(date) => {
                 /* Quem trocou a data fica no passo da janela: com janela na data nova a primeira
                    já vem escolhida, e o painel pularia para a base antes de a pessoa ver o que

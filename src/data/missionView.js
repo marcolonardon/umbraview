@@ -74,6 +74,25 @@ export const missionView = {
   // a data de onde as janelas são procuradas, recolhida no passo da janela
   changeDate: 'Search from another date',
   dateHint: (periodDays) => `Landing windows are searched in the ${periodDays} days after this date.`,
+  /* Sem janela no período, o que a busca adiante achou (sky.nextWindow, card C18). As datas e a
+     duração chegam do motor, já em texto; o "≥" vem junto quando a janela passa do fim do período
+     dela, como nos cartões. */
+  nextWindow: (periodDays, from, opensAt, duration) =>
+    `No landing window in the ${periodDays} days from ${from}. The next one opens on ${opensAt} and lasts ${duration}.`,
+  // o botão que leva a busca para o período da próxima janela
+  useNextWindow: 'Go to the next landing window',
+  // a Terra nunca passou do horizonte na busca inteira: nenhuma data resolve
+  farSide:
+    'The Earth never rises above the horizon here: this is the far side of the Moon, with no direct link to the Earth, so there is no landing window. Choose a point on the near side.',
+  noWindowUntil: (until, minHours) =>
+    `No landing window here until ${until}: the Sun and the Earth are never in view together for ${minHours} hours in a row. Choose another landing site.`,
+  /* O mapa de onde dá para pousar (card C18): o mesmo da vista da Lua (scene.js), com o verde
+     explicado em uma frase, porque o cartão é pequeno. */
+  landingAreasToggle: 'Show where you can land',
+  landingAreasLoading: 'Finding where you can land…',
+  landingAreasReady: (periodDays, minHours) =>
+    `Green areas have a landing window in the ${periodDays} days from this date: ${minHours} hours or more with the Sun and the Earth in view together. Approximate away from the south pole.`,
+  landingAreasError: "Couldn't calculate where you can land. Reload the page to try again.",
   // passo 3: de onde lançar
   stepLaunch: 'Where to launch from?',
   launchHint: 'Click a mark on the Earth.',

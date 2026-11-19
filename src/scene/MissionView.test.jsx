@@ -16,12 +16,15 @@ import { sites } from '../data/sites.js'
 import { MISSION } from '../engine/config.js'
 import { EARTH_EQUATORIAL_RADIUS_KM } from '../engine/earthSite.js'
 import { systemStateAt } from '../engine/system.js'
+import { useLandingAreas } from '../hooks/useLandingAreas.js'
 import { useMission } from '../hooks/useMission.js'
 import { MissionView } from './MissionView.jsx'
 
 vi.mock('@react-three/fiber', () => ({ Canvas: () => <div data-testid="canvas" />, useFrame: () => {} }))
 vi.mock('@react-three/drei', () => ({ Html: () => null, Line: () => null }))
 vi.mock('../hooks/useMission.js', () => ({ useMission: vi.fn() }))
+// o mapa das áreas de pouso roda num Worker, que o jsdom não tem; a conta tem os testes dela (useLandingAreas.test.js)
+vi.mock('../hooks/useLandingAreas.js', () => ({ useLandingAreas: vi.fn(() => ({ status: 'idle', areas: null })) }))
 
 const PARADA = { status: 'idle', mission: null }
 beforeEach(() => {
@@ -710,5 +713,119 @@ describe('MissionView: os detalhes, recolhidos', () => {
     expect(within(detalhes()).getByText(missionView.leftOutNote)).toBeInTheDocument()
     expect(within(detalhes()).getByText(missionView.choicesNote(MISSION))).toBeInTheDocument()
     expect(missionView.choicesNote(MISSION)).toMatch(/185 km up.*about 4 days.*100 km up for about 12 hours.*12 hours after/)
+  })
+})
+
+/* Card C18. Um ponto clicado ao acaso quase nunca tem janela nos 30 dias da data, e o cartão só
+   dizia "troque a data ou o local": a pessoa ficava tentando no escuro. O motor procura adiante
+   (sky.nextWindow, em src/engine/siteSky.js), e o cartão oferece a próxima janela ou diz por que
+   não há nenhuma. */
+describe('MissionView: a próxima janela, para um ponto sem janela no período (card C18)', () => {
+  const PONTO = { lat: -87.5, lon: -150 }
+  const PROXIMA = {
+    landingWindow: { startUtc: new Date('2027-05-15T06:00:00Z'), endUtc: new Date('2027-05-17T10:00:00Z'), durationHours: 52 },
+    periodStartUtc: new Date('2027-05-13T00:00:00Z'),
+    searchedUntilUtc: new Date('2027-06-12T00:00:00Z'),
+    earthEverAboveHorizon: true,
+  }
+  const semJanela = (nextWindow, props = {}) =>
+    renderView({ landingSite: PONTO, skyStatus: 'ready', landingWindows: [], nextWindow, ...props })
+
+  it('sem janela no período, o aviso diz quando abre a próxima e quanto ela dura', () => {
+    semJanela(PROXIMA)
+    expect(within(painel()).getByRole('status')).toHaveTextContent(
+      'No landing window in the 30 days from 14 Nov 2026. The next one opens on 15 May 2027, 06:00 UTC and lasts 2 d 4 h.',
+    )
+  })
+
+  it('um botão leva a busca para o período da próxima janela, e o passo da janela continua aberto', () => {
+    const onDateChange = vi.fn()
+    semJanela(PROXIMA, { onDateChange })
+    fireEvent.click(within(painel()).getByRole('button', { name: missionView.useNextWindow }))
+    expect(onDateChange).toHaveBeenCalledWith(PROXIMA.periodStartUtc)
+    expect(etiqueta(missionView.chipWindow)).toHaveAttribute('aria-current', 'step')
+  })
+
+  it('no lado oculto diz que a Terra nunca aparece ali, e não oferece data nenhuma', () => {
+    semJanela({ landingWindow: null, periodStartUtc: null, searchedUntilUtc: new Date('2027-12-09T00:00:00Z'), earthEverAboveHorizon: false })
+    expect(within(painel()).getByRole('status')).toHaveTextContent(missionView.farSide)
+    expect(within(painel()).queryByRole('button', { name: missionView.useNextWindow })).not.toBeInTheDocument()
+  })
+
+  it('sem janela em um ano, com a Terra à vista às vezes, diz até quando procurou', () => {
+    semJanela({ landingWindow: null, periodStartUtc: null, searchedUntilUtc: new Date('2027-12-09T00:00:00Z'), earthEverAboveHorizon: true })
+    expect(within(painel()).getByRole('status')).toHaveTextContent(
+      'No landing window here until 9 Dec 2027: the Sun and the Earth are never in view together for 24 hours in a row. Choose another landing site.',
+    )
+  })
+
+  it('com janela no período, nada muda: as janelas, sem aviso de próxima', () => {
+    comTudo({ nextWindow: null })
+    fireEvent.click(etiqueta(missionView.chipWindow))
+    expect(within(janelas()).getAllByRole('radio')).toHaveLength(2)
+    expect(within(painel()).queryByRole('button', { name: missionView.useNextWindow })).not.toBeInTheDocument()
+  })
+})
+
+/* Card C18: quem vem da vista da Lua com o ponto já escolhido quer ver as janelas dele. Sem isto, a
+   primeira janela vinha escolhida e o painel pulava direto para a base. */
+describe('MissionView: aberta a partir da vista da Lua (card C18)', () => {
+  it('com startStep 1, abre no passo da janela mesmo com a primeira já escolhida', () => {
+    comTudo({ launchSiteId: null, startStep: 1 })
+    expect(etiqueta(missionView.chipWindow)).toHaveAttribute('aria-current', 'step')
+    expect(within(janelas()).getAllByRole('radio')).toHaveLength(2)
+  })
+
+  it('abrindo no passo da janela, a câmera olha a Lua, onde está o ponto e o mapa de onde pousar', () => {
+    comTudo({ launchSiteId: null, startStep: 1 })
+    expect(camera()).toBe('pole')
+  })
+
+  it('reabrindo a janela a partir do passo da base, a câmera volta da Terra para a Lua', () => {
+    comTudo({ launchSiteId: null })
+    expect(camera()).toBe('earth')
+    fireEvent.click(etiqueta(missionView.chipWindow))
+    expect(camera()).toBe('pole')
+  })
+})
+
+/* Card C18: onde dá para pousar, na própria vista da missão. É o mesmo mapa da vista da Lua (os
+   pontos com janela nos 30 dias da data, useLandingAreas), ligado pelo mesmo estado do App. */
+describe('MissionView: o mapa de onde dá para pousar (card C18)', () => {
+  const mapa = () => within(painel()).queryByRole('button', { name: missionView.landingAreasToggle })
+
+  it('no passo do pouso e no da janela há o botão do mapa, que diz se está ligado e avisa quem guarda', () => {
+    const onToggleLandingAreas = vi.fn()
+    const { unmount } = renderView({ showLandingAreas: false, onToggleLandingAreas })
+    expect(mapa()).toHaveAttribute('aria-pressed', 'false')
+    fireEvent.click(mapa())
+    expect(onToggleLandingAreas).toHaveBeenCalledTimes(1)
+    unmount()
+    renderView({ landingSite: IM2, skyStatus: 'loading', showLandingAreas: true })
+    expect(mapa()).toHaveAttribute('aria-pressed', 'true')
+  })
+
+  it('no passo da base não há botão do mapa: a câmera está na Terra', () => {
+    comTudo({ launchSiteId: null })
+    expect(mapa()).not.toBeInTheDocument()
+  })
+
+  it('a conta do mapa só é pedida com ele ligado, na data da vista', () => {
+    const { unmount } = renderView({ showLandingAreas: false })
+    expect(useLandingAreas).toHaveBeenLastCalledWith(DATA, false)
+    unmount()
+    renderView({ showLandingAreas: true })
+    expect(useLandingAreas).toHaveBeenLastCalledWith(DATA, true)
+  })
+
+  it('com o mapa ligado, a linha ao lado diz o que a cor quer dizer, ou que está calculando', () => {
+    useLandingAreas.mockReturnValueOnce({ status: 'loading', areas: null })
+    const { unmount } = renderView({ showLandingAreas: true })
+    expect(within(painel()).getByText(missionView.landingAreasLoading)).toBeInTheDocument()
+    unmount()
+    useLandingAreas.mockReturnValue({ status: 'ready', areas: {} })
+    renderView({ showLandingAreas: true })
+    expect(within(painel()).getByText(missionView.landingAreasReady(30, 24))).toBeInTheDocument()
+    useLandingAreas.mockReturnValue({ status: 'idle', areas: null })
   })
 })

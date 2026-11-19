@@ -45,12 +45,17 @@ const windowDuration = (item) => `${item.startsBeforePeriod || item.endsAfterPer
    notice: o que impede o passo aberto de andar, ou em que pé a conta está; fica num lugar que o
    leitor de tela anuncia. canLaunch: a missão está pronta. onLaunch: lança.
    focusTarget: a ref do elemento do cartão que recebe o foco quando ele se perde (useKeepFocus): a
-   pergunta do passo aberto, ou, no passo do lançamento, que não tem pergunta, o aviso. */
+   pergunta do passo aberto, ou, no passo do lançamento, que não tem pergunta, o aviso.
+   onUseNextWindow: sem janela no período e com uma achada adiante (sky.nextWindow, card C18), a
+   função que leva a busca para o período dela; sem isso, null, e o botão não aparece.
+   showLandingAreas, onToggleLandingAreas e landingAreasText: o mapa de onde dá para pousar (card
+   C18): se está ligado, quem liga e desliga, e a linha que diz o que a cor quer dizer. */
 export function MissionControl({
   sites, landingSite, onLandingSiteChange,
-  windows, landingWindow, onLandingWindowChange, dateUtc, onDateChange,
+  windows, landingWindow, onLandingWindowChange, dateUtc, onDateChange, onUseNextWindow = null,
   launchSites, launchSite, onLaunchSiteChange,
   openStep, onOpenStep, notice, canLaunch, onLaunch, focusTarget,
+  showLandingAreas = false, onToggleLandingAreas = () => {}, landingAreasText = '',
 }) {
   const titleId = useId()
   const windowTitleId = useId()
@@ -167,6 +172,25 @@ export function MissionControl({
           </div>
         )}
 
+        {/* O mapa de onde dá para pousar (card C18), nos dois passos em que a câmera olha a Lua: é o
+            mesmo da vista da Lua, ligado pelo mesmo botão. A linha ao lado diz o que a cor quer
+            dizer; o aria-live faz o leitor de tela ler quando a conta termina. */}
+        {(openStep === 0 || openStep === 1) && (
+          <div className="mission-control__landing-areas">
+            <button
+              className="mission-control__toggle"
+              type="button"
+              aria-pressed={showLandingAreas}
+              onClick={onToggleLandingAreas}
+            >
+              {missionView.landingAreasToggle}
+            </button>
+            <p className="mission-control__hint" aria-live="polite">
+              {landingAreasText}
+            </p>
+          </div>
+        )}
+
         {/* A data de onde as janelas são procuradas, com o mesmo controle do painel do ponto
             (DateTimeControl.jsx). Recolhida: quase sempre a pessoa só escolhe uma janela. Sem ela,
             quem não achava janela tinha que ir à vista da Lua trocar a data e voltar. */}
@@ -214,6 +238,15 @@ export function MissionControl({
         <p ref={openStep === LAUNCH_STEP ? focusTarget : undefined} tabIndex={-1} className="mission-control__notice" role="status">
           {notice}
         </p>
+
+        {/* A próxima janela, quando o período não tem nenhuma (card C18): um clique leva a busca
+            para o período dela, e as janelas de lá aparecem nos cartões. Fica logo depois do
+            aviso, que diz quando ela abre e quanto dura: lê-se o aviso, e o botão vem em seguida. */}
+        {openStep === 1 && onUseNextWindow && (
+          <button className="mission-control__next-window" type="button" onClick={onUseNextWindow}>
+            {missionView.useNextWindow}
+          </button>
+        )}
 
         {openStep === LAUNCH_STEP && (
           <button className="mission-control__launch" type="button" disabled={!canLaunch} onClick={onLaunch}>

@@ -135,6 +135,66 @@
   margin-top: var(--space-2);
 }
 
+/* A próxima janela (card C18): o passo que destrava a missão, com a borda do destaque, mas sem o
+   fundo cheio do Launch, que é o fim do caminho. */
+.mission-control__next-window {
+  align-self: flex-start;
+  padding: var(--space-2) var(--space-3);
+  border: 1px solid var(--color-accent);
+  border-radius: var(--radius-sm);
+  background: none;
+  color: var(--color-text);
+  font: inherit;
+  font-size: var(--font-size-sm);
+  cursor: pointer;
+  transition: transform var(--duration-press) var(--ease-out);
+}
+
+.mission-control__next-window:active {
+  transform: scale(0.98);
+}
+
+/* O mapa de onde dá para pousar (card C18): o botão e a linha que diz o que a cor quer dizer. O
+   quadradinho tem a cor das manchas, como o botão do mapa na vista da Lua (LunarScene.css). */
+.mission-control__landing-areas {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+}
+
+.mission-control__toggle {
+  display: inline-flex;
+  align-self: flex-start;
+  align-items: center;
+  gap: var(--space-2);
+  padding: var(--space-1) var(--space-2);
+  border: 1px solid var(--color-border-control);
+  border-radius: var(--radius-sm);
+  background: none;
+  color: var(--color-text);
+  font: inherit;
+  font-size: var(--font-size-sm);
+  cursor: pointer;
+}
+
+.mission-control__toggle::before {
+  content: '';
+  width: var(--space-3);
+  height: var(--space-3);
+  border: 1px solid var(--color-border-control);
+  border-radius: var(--radius-sm);
+  transition: background-color var(--duration-fast) var(--ease-out);
+}
+
+.mission-control__toggle[aria-pressed='true'],
+.mission-control__toggle[aria-pressed='true']::before {
+  border-color: var(--color-success);
+}
+
+.mission-control__toggle[aria-pressed='true']::before {
+  background: var(--color-success);
+}
+
 /* As janelas de pouso: um cartão por janela, um embaixo do outro. */
 .mission-control__windows {
   display: flex;
