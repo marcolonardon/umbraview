@@ -557,11 +557,13 @@ function MissionBodies({
    escolhe na lista.
    sites: os locais de pouso conhecidos (src/data/sites.js), para a lista do painel da missão.
    onLandingSiteChange: chamada com o local escolhido, da lista ou do clique na Lua (card C17).
+   onDateChange: chamada com a data que a pessoa escolhe no passo da janela; é a data da tela
+   inteira, de onde as janelas de pouso são procuradas.
    Quem guarda as escolhas é o App.jsx, para elas não se perderem quando a pessoa troca de vista. */
 export function MissionView({
   dateUtc, launchSites, launchSiteId, onLaunchSiteChange,
   landingSite = null, skyStatus = 'idle', landingWindows = null, landingWindowStartMs = null, onLandingWindowChange,
-  sites = [], onLandingSiteChange = () => {},
+  sites = [], onLandingSiteChange = () => {}, onDateChange = () => {},
 }) {
   const selectedIndex = launchSites.findIndex((site) => site.id === launchSiteId)
   const launchSite = launchSites[selectedIndex] ?? null
@@ -788,6 +790,14 @@ export function MissionView({
               onLandingWindowChange={(startMs) => {
                 setChosenStep(null)
                 onLandingWindowChange(startMs)
+              }}
+              dateUtc={dateUtc}
+              onDateChange={(date) => {
+                /* Quem trocou a data fica no passo da janela: com janela na data nova a primeira
+                   já vem escolhida, e o painel pularia para a base antes de a pessoa ver o que
+                   mudou. */
+                setChosenStep(1)
+                onDateChange(date)
               }}
               launchSites={launchSites}
               launchSite={launchSite}

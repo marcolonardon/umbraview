@@ -342,6 +342,18 @@ describe('App, a vista da missão (card C13)', () => {
     expect(vistaDaMissao.props.skyStatus).not.toBe('idle')
   })
 
+  /* Sobra do card C17: a data só se trocava no painel do ponto, que na vista da missão sai da
+     tela. A vista passa a poder trocá-la, e é a mesma data da tela inteira. */
+  it('a data trocada de dentro da vista da missão é a data da tela inteira', () => {
+    render(<App />)
+    fireEvent.click(screen.getByRole('button', { name: missionView.viewMission }))
+    const nova = new Date('2026-12-01T00:00:00Z')
+    act(() => vistaDaMissao.props.onDateChange(nova))
+    expect(vistaDaMissao.props.dateUtc).toEqual(nova)
+    fireEvent.click(screen.getByRole('button', { name: systemView.viewMoon }))
+    expect(sceneProps.dateUtc).toEqual(nova)
+  })
+
   it('a janela de pouso escolhida continua escolhida depois de ir a outra vista e voltar', () => {
     render(<App />)
     const missao = screen.getByRole('button', { name: missionView.viewMission })

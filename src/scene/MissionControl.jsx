@@ -2,7 +2,7 @@
  * com o passo aberto.
  *
  *   1. Onde pousar: um local conhecido, na lista, ou qualquer ponto da Lua, com um clique nela.
- *   2. Quando pousar: uma das janelas de pouso daquele local.
+ *   2. Quando pousar: uma das janelas de pouso daquele local, e a data de onde elas são procuradas.
  *   3. De onde lançar: uma base, na lista ou com um clique na marca dela na Terra.
  *
  * Uma decisão por vez: a primeira versão mostrava os três passos abertos ao lado da cena, e a cena
@@ -20,6 +20,8 @@ import { useId } from 'react'
 
 import { missionView } from '../data/missionView.js'
 import { panel } from '../data/panel.js'
+import { PERIOD_DAYS } from '../engine/config.js'
+import { DateTimeControl } from '../panel/DateTimeControl.jsx'
 import { formatDuration, formatUtc, formatUtcDate } from '../panel/format.js'
 import './MissionControl.css'
 
@@ -35,6 +37,8 @@ const windowDuration = (item) => `${item.startsBeforePeriod || item.endsAfterPer
    e, quando veio da lista, id e name; ou null. onLandingSiteChange: chamada com o local da lista.
    windows e landingWindow: as janelas de pouso do local e a escolhida, ou null.
    onLandingWindowChange: chamada com o começo da janela, em milissegundos UTC.
+   dateUtc: a data de onde as janelas são procuradas (um Date). onDateChange: chamada com a data
+   que a pessoa escolhe no passo da janela.
    launchSites e launchSite: as bases e a escolhida, ou null. onLaunchSiteChange: chamada com o id.
    openStep: o passo aberto no cartão, de 0 a 2, ou LAUNCH_STEP. onOpenStep: chamada com o passo
    da etiqueta que a pessoa clicou.
@@ -44,7 +48,7 @@ const windowDuration = (item) => `${item.startsBeforePeriod || item.endsAfterPer
    pergunta do passo aberto, ou, no passo do lançamento, que não tem pergunta, o aviso. */
 export function MissionControl({
   sites, landingSite, onLandingSiteChange,
-  windows, landingWindow, onLandingWindowChange,
+  windows, landingWindow, onLandingWindowChange, dateUtc, onDateChange,
   launchSites, launchSite, onLaunchSiteChange,
   openStep, onOpenStep, notice, canLaunch, onLaunch, focusTarget,
 }) {
@@ -161,6 +165,17 @@ export function MissionControl({
               </label>
             ))}
           </div>
+        )}
+
+        {/* A data de onde as janelas são procuradas, com o mesmo controle do painel do ponto
+            (DateTimeControl.jsx). Recolhida: quase sempre a pessoa só escolhe uma janela. Sem ela,
+            quem não achava janela tinha que ir à vista da Lua trocar a data e voltar. */}
+        {openStep === 1 && (
+          <details className="mission-control__list">
+            <summary className="mission-control__list-summary">{missionView.changeDate}</summary>
+            <DateTimeControl dateUtc={dateUtc} onChange={onDateChange} />
+            <p className="mission-control__hint">{missionView.dateHint(PERIOD_DAYS)}</p>
+          </details>
         )}
 
         {openStep === 2 && (

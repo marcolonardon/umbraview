@@ -94,10 +94,13 @@ export default function App() {
             )}
             {/* a key recomeça o relógio da vista quando a data muda: a hora 300 de uma data não é a de outra */}
             {view === 'system' && <SystemView key={dateUtc.getTime()} dateUtc={dateUtc} onDateChange={setDateUtc} />}
+            {/* Sem key, ao contrário da vista do sistema: a data se troca de dentro desta vista, no
+                passo da janela, e recomeçar a vista a cada tecla tiraria o foco do campo e fecharia
+                o passo. O relógio dela é o da missão, que recomeça sozinho quando a missão muda. */}
             {view === 'mission' && (
               <MissionView
-                key={dateUtc.getTime()}
                 dateUtc={dateUtc}
+                onDateChange={setDateUtc}
                 launchSites={launchSites}
                 launchSiteId={launchSiteId}
                 onLaunchSiteChange={setLaunchSiteId}

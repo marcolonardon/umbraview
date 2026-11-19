@@ -45,8 +45,8 @@ export const missionView = {
   // o que falta para haver uma missão, um texto por estado
   windowsLoading: 'Calculating the landing windows of the landing site…',
   windowsError: 'The landing windows of this landing site could not be calculated, so there is no mission to simulate.',
-  // a data não se troca nesta vista: o caminho é outro local
-  noWindows: (periodDays) => `No landing window here in the next ${periodDays} days. Choose another landing site.`,
+  // sem janela, os dois caminhos estão na vista: a data, no próprio passo, e o local, no passo anterior
+  noWindows: (periodDays) => `No landing window here in the next ${periodDays} days. Choose another date or another landing site.`,
   missionLoading: 'Calculating the mission…',
   missionError: 'No path was found from this launch site to this landing window.',
   missionReady: 'Ready to launch.',
@@ -71,6 +71,9 @@ export const missionView = {
   // passo 2: quando pousar
   stepWindow: 'When to land?',
   windowWaiting: 'Choose where to land first.',
+  // a data de onde as janelas são procuradas, recolhida no passo da janela
+  changeDate: 'Search from another date',
+  dateHint: (periodDays) => `Landing windows are searched in the ${periodDays} days after this date.`,
   // passo 3: de onde lançar
   stepLaunch: 'Where to launch from?',
   launchHint: 'Click a mark on the Earth.',

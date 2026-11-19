@@ -86,7 +86,7 @@ installs everything on Windows, from scratch.
 - Mission control, over that scene (card C17, in progress): in the Mission view the scene takes
   the whole width, and the site panel leaves the page. Three labels, one per step, and one card
   with only the open step: where to land (a pin of a known site on the Moon, or any other point of
-  it, with a click), when to land (one card per landing window of that site) and where to launch
+  it, with a click), when to land (one card per landing window of that site, and the date they are searched from) and where to launch
   from (a click on the mark of a pad on the Earth). The camera goes by itself to the south pole
   of the Moon or to the Earth, where one chooses, and the lists stay folded in the card, for the
   keyboard. With the three done, a Launch button plays the mission from the pad. In

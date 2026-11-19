@@ -11,6 +11,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 
 import { launchSites } from '../data/launchSites.js'
 import { missionView } from '../data/missionView.js'
+import { panel } from '../data/panel.js'
 import { sites } from '../data/sites.js'
 import { MISSION } from '../engine/config.js'
 import { EARTH_EQUATORIAL_RADIUS_KM } from '../engine/earthSite.js'
@@ -210,8 +211,52 @@ describe('MissionView: montar a missão, um passo por vez', () => {
     unmount()
     comTudo({ landingWindows: [] })
     expect(etiqueta(missionView.chipWindow)).toHaveAttribute('aria-current', 'step')
-    expect(within(painel()).getByRole('status')).toHaveTextContent('No landing window here in the next 30 days. Choose another landing site.')
+    expect(within(painel()).getByRole('status')).toHaveTextContent('No landing window here in the next 30 days. Choose another date or another landing site.')
     expect(useMission).toHaveBeenLastCalledWith(KENNEDY, IM2, null)
+  })
+
+  /* A data de onde as janelas são procuradas só se trocava no painel do ponto, que na vista da
+     missão sai da tela: quem não achava janela tinha que ir à vista da Lua, trocar a data e voltar
+     (sobra do card C17). O controle é o mesmo do painel, recolhido no passo da janela. */
+  const data = () => within(painel()).getByLabelText(panel.dateTimeLabel)
+
+  it('no passo da janela dá para procurar a partir de outra data, com o mesmo controle do painel', () => {
+    const onDateChange = vi.fn()
+    comTudo({ onDateChange })
+    fireEvent.click(etiqueta(missionView.chipWindow))
+    expect(data()).toHaveValue('2026-11-14T00:00')
+    expect(data().closest('details')).not.toHaveAttribute('open')
+    expect(within(data().closest('details')).getByText(missionView.changeDate)).toBeInTheDocument()
+    fireEvent.change(data(), { target: { value: '2026-12-01T00:00' } })
+    expect(onDateChange).toHaveBeenCalledWith(new Date('2026-12-01T00:00:00Z'))
+  })
+
+  it('a data só aparece no passo da janela: uma decisão por vez', () => {
+    comTudo({ launchSiteId: null })
+    expect(within(painel()).queryByLabelText(panel.dateTimeLabel)).not.toBeInTheDocument()
+  })
+
+  it('sem janela no período, o aviso manda trocar a data ou o local, e a data está ali', () => {
+    renderView({ landingSite: IM2, skyStatus: 'ready', landingWindows: [] })
+    expect(within(painel()).getByRole('status')).toHaveTextContent(/another date or another landing site/)
+    expect(data()).toBeInTheDocument()
+  })
+
+  /* Com janela na data nova, a primeira já vem escolhida, e o painel pularia para a base antes de
+     a pessoa ver o que a data nova trouxe. Quem trocou a data fica no passo da janela. */
+  it('depois de trocar a data o passo da janela continua aberto, com as janelas da data nova', () => {
+    const { rerender } = renderView({ landingSite: IM2, skyStatus: 'ready', landingWindows: [], onDateChange: () => {} })
+    fireEvent.change(data(), { target: { value: '2026-12-01T00:00' } })
+    rerender(
+      <MissionView
+        dateUtc={new Date('2026-12-01T00:00:00Z')} launchSites={launchSites} launchSiteId={null} onLaunchSiteChange={() => {}}
+        landingSite={IM2} skyStatus="ready" landingWindows={JANELAS} landingWindowStartMs={null} onLandingWindowChange={() => {}}
+        sites={sites} onLandingSiteChange={() => {}} onDateChange={() => {}}
+      />,
+    )
+    expect(etiqueta(missionView.chipWindow)).toHaveAttribute('aria-current', 'step')
+    expect(within(janelas()).getAllByRole('radio')).toHaveLength(2)
+    expect(data()).toHaveValue('2026-12-01T00:00')
   })
 
   it('a etiqueta da janela, aberta sem local de pouso, pede o local primeiro', () => {

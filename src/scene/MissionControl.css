@@ -96,12 +96,15 @@
   clip-path: inset(50%);
 }
 
-/* O cartão do passo aberto, no canto de baixo da cena. */
+/* O cartão do passo aberto, no canto de baixo da cena. Com muitas janelas e a data aberta ele
+   pode ficar mais alto que a cena: aí encolhe até caber e rola por dentro. */
 .mission-control__card {
   align-self: flex-end;
   display: flex;
   flex-direction: column;
   gap: var(--space-3);
+  min-height: 0;
+  overflow-y: auto;
   width: min(100%, calc(var(--panel-width) * 0.8));
   padding: var(--space-4);
   border: 1px solid var(--color-border);
@@ -125,6 +128,11 @@
 
 .mission-control__list[open] > .mission-control__list-summary {
   margin-bottom: var(--space-2);
+}
+
+/* a explicação embaixo do campo da data, dentro da lista recolhida */
+.mission-control__list > .mission-control__hint {
+  margin-top: var(--space-2);
 }
 
 /* As janelas de pouso: um cartão por janela, um embaixo do outro. */

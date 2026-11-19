@@ -183,3 +183,15 @@
     border-inline-start: 0;
   }
 }
+
+/* Em tela de celular o título da cena não cabe ao lado do seletor de vista, e ficava cortado
+   embaixo dele ("LUNAR SC"). Sai da vista e continua dando nome à região para o leitor de tela. */
+@media (max-width: 600px) {
+  .app__region-title--over {
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip-path: inset(50%);
+    white-space: nowrap;
+  }
+}

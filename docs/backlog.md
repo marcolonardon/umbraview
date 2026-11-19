@@ -2221,10 +2221,9 @@ tells about the view; and `verify` passes.
 ### C17 · Mission control: build the mission one step at a time, and fly it
 
 **Status:** in progress on the branch `feat/c17-mission-control` of Marco's fork
-(`marcolonardon/umbraview`), born from the branch of card C16. The five phases built on 18/11; they
-wait for Marco's check in the browser, and phase 5 for a test with someone who has never seen the
-screen. The card waits for Enzo's OK and for the PR
-number ·
+(`marcolonardon/umbraview`), born from the branch of card C16. The five phases built on 18/11,
+and Marco checked the screen in his browser the same day. Still to do: the test with someone who
+has never seen the screen (phase 5). The card waits for Enzo's OK and for the PR number ·
 **Depends on:** C16
 
 **What it is for.** In card C16 the landing site could only be chosen outside the Mission view,
@@ -2608,9 +2607,42 @@ with the pane in view:
   roles, the names and the notices are in the tests, but nothing was listened to); a real phone
   or a touch screen (the pane imitates the size, and its clicks are mouse clicks); the request
   for less motion in a browser (it has a test now); and browsers other than Chromium.
-- Known and left: the date cannot be changed from inside the Mission view; on a phone the small
-  title "Lunar scene" is under the view selector, in the three views; `ViewClock.jsx` still has
-  the `stepHours` that card C16 gave it, now unused.
+- Known and left, and done right after (below): the date cannot be changed from inside the
+  Mission view; on a phone the small title "Lunar scene" is under the view selector, in the three
+  views; `ViewClock.jsx` still has the `stepHours` that card C16 gave it, now unused.
+
+**The three things left by phase 5, done on 18/11** after Marco's check.
+- **The date, from inside the Mission view.** The date from which the landing windows are searched
+  could only be changed in the site panel, which leaves the page in this view: with no window, one
+  had to go to the Moon view, change the date and come back. The window step now has the same
+  control as the panel (`DateTimeControl.jsx`), folded under "Search from another date", with a
+  line saying that the windows are searched in the 30 days after it. Changing the date keeps the
+  window step open, so that the windows of the new date are seen before the panel moves on. The
+  notice for no window now says "Choose another date or another landing site". `App.jsx` no longer
+  restarts the Mission view when the date changes (the `key`): it would take the focus from the
+  field at every key and close the step.
+- **The small title "Lunar scene" on a phone.** It did not fit beside the view selector and was
+  cut under it ("LUNAR SC"), in the three views. Up to 600 px wide it leaves the view and still
+  names the region for the screen reader.
+- **`stepHours` left `ViewClock.jsx`**, which is back to what it was before card C16: only the
+  system view uses it, by the hour.
+
+**Verified for the three** on 18/11/2026, with `npm run dev` in the app's browser pane (Chromium):
+- At 1440 × 900, with Athena (IM-2) chosen: the window step reopened shows the two windows and,
+  under "Search from another date", the field with the date of the page and the "Now" button.
+  Changing it to 10 Jan 2027 kept the step and the field open and the focus in the field, the list
+  became the one window of that period (14 d 4 h, from 13 Jan 2027), and the Earth was redrawn for
+  the new date.
+- At 375 × 812: no piece of the title beside the selector, and the region still named by it; the
+  window card with the date open fits inside the scene.
+- In the system view, after the change: the cursor at hour 100 reads "14 Jan 2027, 04:00 UTC", 100
+  hours after the new date, in the control and in the text beside it.
+- The console, on a fresh load: no error, only the usual `THREE.Clock` warning.
+- Test first: the four tests of the date failed before the code; one older test, which quoted the
+  old text of the notice, was updated to the new one.
+- `npm run verify` passes, with 919 tests in 68 files and no lint warning.
+- Not verified: typing a date key by key in a real browser (the pane sets the whole value at
+  once); and what was not verified in phase 5.
 
 ---
 
