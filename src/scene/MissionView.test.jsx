@@ -872,3 +872,100 @@ describe('MissionView: as bases que servem para a janela (card C19)', () => {
     expect(valor(missionView.allowedDirections)).toBe(missionView.directionsNotChecked)
   })
 })
+
+/* Um passo reaberto que já tem escolha (visto pelo Marco em 19/11/2026): a base continuava escolhida
+   na lista, mas o painel ficava parado no passo, sem o cartão do lançamento, e só andava escolhendo
+   outra base e depois a mesma de novo. Uma lista não avisa quando se escolhe o que já estava
+   escolhido, e uma janela já marcada também não. Em toda ordem de escolha, o painel tem que seguir. */
+describe('MissionView: a ordem das escolhas não trava o painel', () => {
+  const seguir = () => within(painel()).getByRole('button', { name: missionView.continueStep })
+  const naCartaDoLancamento = () => expect(lancar()).toBeInTheDocument()
+
+  it('reabrindo a base já escolhida, "Continue" mantém a base e volta ao lançamento', () => {
+    useMission.mockReturnValue({ status: 'ready', mission: missaoDaPonte() })
+    const { onLaunchSiteChange } = comTudo()
+    fireEvent.click(etiqueta(missionView.chipLaunch))
+    expect(bases()).toHaveDisplayValue(KENNEDY.name)
+    fireEvent.click(seguir())
+    naCartaDoLancamento()
+    expect(lancar()).toBeEnabled()
+    expect(onLaunchSiteChange).not.toHaveBeenCalled()
+  })
+
+  it('reabrindo a janela, clicar na janela que já estava marcada segue em frente', () => {
+    comTudo()
+    fireEvent.click(etiqueta(missionView.chipWindow))
+    const marcada = within(janelas()).getAllByRole('radio')[0]
+    expect(marcada).toBeChecked()
+    fireEvent.click(marcada)
+    naCartaDoLancamento()
+  })
+
+  it('reabrindo a janela, "Continue" também segue', () => {
+    comTudo()
+    fireEvent.click(etiqueta(missionView.chipWindow))
+    fireEvent.click(seguir())
+    naCartaDoLancamento()
+  })
+
+  it('reabrindo o local de pouso já escolhido, "Continue" segue para o primeiro passo que falta', () => {
+    comTudo({ launchSiteId: null })
+    fireEvent.click(etiqueta(missionView.chipLanding))
+    fireEvent.click(seguir())
+    expect(etiqueta(missionView.chipLaunch)).toHaveAttribute('aria-current', 'step')
+  })
+
+  it('depois de trocar a data, com a base escolhida, a primeira janela da data nova leva ao lançamento', () => {
+    const props = { launchSiteId: KENNEDY.id, landingSite: IM2, skyStatus: 'ready', onDateChange: () => {} }
+    const { rerender } = renderView({ ...props, landingWindows: JANELAS })
+    fireEvent.click(etiqueta(missionView.chipWindow))
+    fireEvent.change(within(painel()).getByLabelText(panel.dateTimeLabel), { target: { value: '2026-12-01T00:00' } })
+    rerender(
+      <MissionView
+        dateUtc={new Date('2026-12-01T00:00:00Z')} launchSites={launchSites} onLaunchSiteChange={() => {}}
+        landingWindows={[JANELAS[1]]} landingWindowStartMs={null} onLandingWindowChange={() => {}}
+        sites={sites} onLandingSiteChange={() => {}} {...props}
+      />,
+    )
+    expect(etiqueta(missionView.chipWindow)).toHaveAttribute('aria-current', 'step')
+    fireEvent.click(within(janelas()).getAllByRole('radio')[0])
+    naCartaDoLancamento()
+    // a base continua a mesma, e a missão é pedida com a janela nova
+    expect(useMission).toHaveBeenLastCalledWith(KENNEDY, IM2, JANELAS[1])
+  })
+
+  it('trocar o local de pouso com a base escolhida vai direto ao lançamento, com a mesma base', async () => {
+    const { rerender } = comTudo()
+    fireEvent.click(etiqueta(missionView.chipLanding))
+    await userEvent.selectOptions(locais(), IM2_DA_LISTA.name)
+    rerender(
+      <MissionView
+        dateUtc={DATA} launchSites={launchSites} launchSiteId={KENNEDY.id} onLaunchSiteChange={() => {}}
+        landingSite={IM2_DA_LISTA} skyStatus="ready" landingWindows={JANELAS} landingWindowStartMs={null}
+        onLandingWindowChange={() => {}} sites={sites} onLandingSiteChange={() => {}}
+      />,
+    )
+    naCartaDoLancamento()
+    expect(useMission).toHaveBeenLastCalledWith(KENNEDY, IM2_DA_LISTA, JANELAS[0])
+  })
+
+  it('um passo sem escolha não tem "Continue": não há o que manter', () => {
+    renderView()
+    expect(within(painel()).queryByRole('button', { name: missionView.continueStep })).not.toBeInTheDocument()
+    fireEvent.click(etiqueta(missionView.chipWindow))
+    expect(within(painel()).queryByRole('button', { name: missionView.continueStep })).not.toBeInTheDocument()
+  })
+
+  it('voando, "Change mission" e depois trocar o local de pouso mantém a base', async () => {
+    useMission.mockReturnValue({ status: 'ready', mission: missaoDaPonte() })
+    comTudo()
+    fireEvent.click(lancar())
+    fireEvent.click(screen.getByRole('button', { name: missionView.changeMission }))
+    naCartaDoLancamento()
+    fireEvent.click(etiqueta(missionView.chipLaunch))
+    fireEvent.click(seguir())
+    naCartaDoLancamento()
+    expect(etiqueta(missionView.chipLaunch)).toHaveTextContent(KENNEDY.name)
+  })
+})
+

@@ -62,13 +62,17 @@ describe('o clique numa marca de base (readSiteClick)', () => {
     expect(clique([0, 1], 2)).toBe(0)
   })
 
-  it('clicar na marca que já está escolhida, sozinha, não faz nada', () => {
-    expect(clique([2], 2)).toBe(NADA)
+  /* Num passo reaberto, clicar de novo na base escolhida é o que diz que a pessoa quer essa mesma: o
+     painel segue. Antes o clique não fazia nada, e o painel ficava parado (visto pelo Marco em
+     19/11/2026). */
+  it('clicar na marca que já está escolhida, sozinha, escolhe ela de novo', () => {
+    expect(clique([2], 2)).toBe(2)
   })
 
   it('a mesma marca repetida nos acertos conta uma vez só, e o que não é marca é ignorado', () => {
     expect(clique([0, 0, 1, undefined], 0)).toBe(1)
-    expect(clique([0, 0], 0)).toBe(NADA)
+    // repetida, a escolhida conta como uma marca só: é escolhida de novo
+    expect(clique([0, 0], 0)).toBe(0)
     expect(clique([undefined])).toBe(NADA)
   })
 })

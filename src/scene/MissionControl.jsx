@@ -50,13 +50,14 @@ const windowDuration = (item) => `${item.startsBeforePeriod || item.endsAfterPer
    pergunta do passo aberto, ou, no passo do lançamento, que não tem pergunta, o aviso.
    onUseNextWindow: sem janela no período e com uma achada adiante (sky.nextWindow, card C18), a
    função que leva a busca para o período dela; sem isso, null, e o botão não aparece.
+   onContinue: chamada quando a pessoa segue com o que já estava escolhido no passo reaberto.
    showLandingAreas, onToggleLandingAreas e landingAreasText: o mapa de onde dá para pousar (card
    C18): se está ligado, quem liga e desliga, e a linha que diz o que a cor quer dizer. */
 export function MissionControl({
   sites, landingSite, onLandingSiteChange,
   windows, landingWindow, onLandingWindowChange, dateUtc, onDateChange, onUseNextWindow = null,
   launchSites, launchSite, onLaunchSiteChange, reach = null,
-  openStep, onOpenStep, notice, canLaunch, onLaunch, focusTarget,
+  openStep, onOpenStep, notice, canLaunch, onLaunch, focusTarget, onContinue = () => {},
   showLandingAreas = false, onToggleLandingAreas = () => {}, landingAreasText = '',
 }) {
   const titleId = useId()
@@ -170,6 +171,11 @@ export function MissionControl({
                   name={windowTitleId}
                   checked={item === landingWindow}
                   onChange={() => onLandingWindowChange(item.startUtc.getTime())}
+                  /* A janela que já estava marcada não dispara o onChange: o clique nela é o que
+                     diz que a pessoa quer essa mesma, e o painel segue. */
+                  onClick={() => {
+                    if (item === landingWindow) onLandingWindowChange(item.startUtc.getTime())
+                  }}
                 />
                 <span className="mission-control__window-duration">{windowDuration(item)}</span>{' '}
                 <span className="mission-control__window-dates">
@@ -239,6 +245,14 @@ export function MissionControl({
               ))}
             </select>
           </details>
+        )}
+
+        {/* O passo reaberto que já tem escolha segue com ela: a lista não avisa quando se escolhe o
+            que já estava escolhido, e sem isto era preciso escolher outra coisa e voltar. */}
+        {openStep !== LAUNCH_STEP && chips[openStep]?.value && (
+          <button className="mission-control__continue" type="button" onClick={onContinue}>
+            {missionView.continueStep}
+          </button>
         )}
 
         {/* Sempre na página, mesmo vazio: é o que faz o leitor de tela anunciar "calculando" e o

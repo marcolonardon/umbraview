@@ -23,14 +23,15 @@ const NOTHING = -1
      isto um clique no mar escolheria a base que está atrás dele;
    - com várias marcas no mesmo lugar (plataformas a poucos quilômetros uma da outra), clicar de
      novo passa para a seguinte, dando a volta. Sem isto, só a da frente poderia ser escolhida pelo
-     clique. */
+     clique. Uma marca sozinha, já escolhida, é escolhida de novo. */
 export function readSiteClick({ delta, hits }, markers, camera, selectedIndex) {
   if (delta > CLICK_MAX_DRAG_PX) return NOTHING
   const inView = [...new Set(hits)].filter((index) => markers[index] && facesCamera(markers[index], camera))
   if (inView.length === 0) return NOTHING
   const current = inView.indexOf(selectedIndex)
   if (current === -1) return inView[0]
-  if (inView.length === 1) return NOTHING
+  // sozinha, a escolhida é escolhida de novo: num passo reaberto, é o que faz o painel seguir
+  if (inView.length === 1) return selectedIndex
   return inView[(current + 1) % inView.length]
 }
 

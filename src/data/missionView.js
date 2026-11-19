@@ -101,6 +101,9 @@ export const missionView = {
   landingAreasError: "Couldn't calculate where you can land. Reload the page to try again.",
   // passo 3: de onde lançar
   stepLaunch: 'Where to launch from?',
+  /* Num passo reaberto que já tem escolha, segue com ela: uma lista não avisa quando se escolhe o
+     que já estava escolhido, e o painel ficava parado no passo (visto pelo Marco em 19/11/2026). */
+  continueStep: 'Continue',
   launchHint: 'Click a mark on the Earth.',
   // o botão que solta a missão: põe a câmera na nave e toca o relógio, do lançamento
   launchButton: 'Launch',

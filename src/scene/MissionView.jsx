@@ -914,6 +914,8 @@ export function MissionView({
               }}
               openStep={openStep}
               onOpenStep={setChosenStep}
+              // segue com o que já estava escolhido: o painel volta ao primeiro passo que falta
+              onContinue={() => setChosenStep(null)}
               notice={notice}
               canLaunch={Boolean(mission)}
               onLaunch={launch}
