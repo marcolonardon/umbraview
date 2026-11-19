@@ -28,6 +28,7 @@ import { EARTH_EQUATORIAL_RADIUS_KM, EARTH_SIDEREAL_DAY_HOURS, earthSiteKm } fro
 import { ECLIPTIC_SKY_MATRIX, moonOrbitPath, systemStateAt } from '../engine/system.js'
 import { useKeepFocus } from '../hooks/useKeepFocus.js'
 import { useLandingAreas } from '../hooks/useLandingAreas.js'
+import { useLaunchReach } from '../hooks/useLaunchReach.js'
 import { useMission } from '../hooks/useMission.js'
 import { usePrefersReducedMotion } from '../hooks/usePrefersReducedMotion.js'
 import { useViewClock } from '../hooks/useViewClock.js'
@@ -280,10 +281,12 @@ function PathLine({ line, flown }) {
    craftTick: o passo do trilho em que a missão está; é o que faz a câmera da nave acompanhá-la.
    freeCamera: a pessoa soltou a câmera; ela vai junto com a nave, mas não se põe sozinha.
    landingAreas: o mapa de onde dá para pousar (o areas do useLandingAreas), ou null desligado
-   (card C18). */
+   (card C18).
+   reach: o que a conta rápida disse de cada base para a janela (useLaunchReach), ou null; a marca
+   da base que não alcança a órbita fica na cor apagada (card C19). */
 function MissionBodies({
   state, orbit, sites, markers, selectedIndex, faceSelected, onPick, dateUtc, reducedMotion, cameraView, labels, path, craft, missionKey,
-  landingSite, onPickLanding, launchKey, upcoming, knownSites, step, flown, craftTick, freeCamera, landingAreas,
+  landingSite, onPickLanding, launchKey, upcoming, knownSites, step, flown, craftTick, freeCamera, landingAreas, reach,
 }) {
   const planning = step !== null
   // a largura da cena sobre a altura dela: numa cena em pé, a câmera do passo do pouso começa mais alta
@@ -492,7 +495,9 @@ function MissionBodies({
             }}
           >
             <sphereGeometry args={[(i === selectedIndex ? SELECTED_MARKER_RADIUS : MARKER_RADIUS) * (step === 2 ? PAD_STEP_SCALE : 1), 16, 8]} />
-            <meshBasicMaterial color={token(i === selectedIndex ? '--color-accent' : '--color-text')} />
+            <meshBasicMaterial
+              color={token(i === selectedIndex ? '--color-accent' : reach?.[sites[i].id] === 'blocked' ? '--color-text-muted' : '--color-text')}
+            />
           </mesh>
         ) : null,
       )}
@@ -638,7 +643,10 @@ export function MissionView({
   const launchSite = launchSites[selectedIndex] ?? null
   const windows = landingSite && skyStatus === 'ready' ? (landingWindows ?? []) : []
   const landingWindow = windows.find((item) => item.startUtc.getTime() === landingWindowStartMs) ?? windows[0] ?? null
-  const { status: missionStatus, mission } = useMission(launchSite, landingSite, landingWindow)
+  const { status: missionStatus, mission, reason: missionReason } = useMission(launchSite, landingSite, landingWindow)
+  /* Quais bases lançam, na janela escolhida, na direção que permitem (card C19): a lista as separa,
+     e as marcas delas na Terra ficam apagadas. */
+  const reach = useLaunchReach(launchSites, landingWindow)
 
   /* O relógio da missão anda pelo trilho, em passos de 0 a TRACK_STEPS, e não pelo tempo: o
      instante sai do lugar no trilho (timeAtTrack). O "hour" do useViewClock aqui é esse lugar.
@@ -744,7 +752,7 @@ export function MissionView({
     : ''
   const launchNotice =
     missionStatus === 'loading' ? missionView.missionLoading
-    : missionStatus === 'error' ? missionView.missionError
+    : missionStatus === 'error' ? (missionReason === 'azimuth' ? missionView.launchBlocked : missionView.missionError)
     : mission ? missionView.missionReady
     : ''
   const notice = openStep === 1 ? windowNotice : openStep === LAUNCH_STEP ? launchNotice : ''
@@ -855,6 +863,7 @@ export function MissionView({
                 launchKey={launchCount}
                 craftTick={Math.round(clock.hour)}
                 freeCamera={freeCamera}
+                reach={reach}
                 landingAreas={flying ? null : landing.areas}
               />
             </Canvas>
@@ -898,6 +907,7 @@ export function MissionView({
               }}
               launchSites={launchSites}
               launchSite={launchSite}
+              reach={reach}
               onLaunchSiteChange={(id) => {
                 setFaceSelected(true)
                 chooseLaunchSite(id)
@@ -1005,6 +1015,10 @@ export function MissionView({
               <div>
                 <dt>{missionView.coordinates}</dt>
                 <dd>{missionView.coordinatesValue(launchSite)}</dd>
+              </div>
+              <div>
+                <dt>{missionView.allowedDirections}</dt>
+                <dd>{launchSite.azimuthLimits ? missionView.directionsValue(launchSite.azimuthLimits) : missionView.directionsNotChecked}</dd>
               </div>
               <div>
                 <dt>{missionView.lunarLaunch}</dt>

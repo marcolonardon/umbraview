@@ -40,6 +40,8 @@ const windowDuration = (item) => `${item.startsBeforePeriod || item.endsAfterPer
    dateUtc: a data de onde as janelas são procuradas (um Date). onDateChange: chamada com a data
    que a pessoa escolhe no passo da janela.
    launchSites e launchSite: as bases e a escolhida, ou null. onLaunchSiteChange: chamada com o id.
+   reach: o que a conta rápida disse de cada base para a janela, { [id]: 'ok' | 'blocked' |
+   'unchecked' }, ou null (card C19). As 'blocked' vão para um grupo próprio da lista.
    openStep: o passo aberto no cartão, de 0 a 2, ou LAUNCH_STEP. onOpenStep: chamada com o passo
    da etiqueta que a pessoa clicou.
    notice: o que impede o passo aberto de andar, ou em que pé a conta está; fica num lugar que o
@@ -53,7 +55,7 @@ const windowDuration = (item) => `${item.startsBeforePeriod || item.endsAfterPer
 export function MissionControl({
   sites, landingSite, onLandingSiteChange,
   windows, landingWindow, onLandingWindowChange, dateUtc, onDateChange, onUseNextWindow = null,
-  launchSites, launchSite, onLaunchSiteChange,
+  launchSites, launchSite, onLaunchSiteChange, reach = null,
   openStep, onOpenStep, notice, canLaunch, onLaunch, focusTarget,
   showLandingAreas = false, onToggleLandingAreas = () => {}, landingAreasText = '',
 }) {
@@ -72,9 +74,15 @@ export function MissionControl({
   const siteGroups = Object.entries(
     Object.groupBy(sites, (site) => (site.landedAtUtc ? panel.siteGroupLanded : panel.siteGroupCandidates)),
   )
+  /* A base que não alcança a órbita da janela (card C19) sai do grupo dela e vai para o último:
+     continua escolhível, e escolhê-la mostra o motivo no aviso. */
   const launchGroups = Object.entries(
-    Object.groupBy(launchSites, (site) => (site.lunarLaunch ? missionView.groupLaunched : missionView.groupNotYet)),
-  )
+    Object.groupBy(launchSites, (site) =>
+      reach?.[site.id] === 'blocked' ? missionView.groupCantReach
+      : site.lunarLaunch ? missionView.groupLaunched
+      : missionView.groupNotYet,
+    ),
+  ).sort(([a], [b]) => (a === missionView.groupCantReach) - (b === missionView.groupCantReach))
 
   return (
     <section className="mission-control" aria-labelledby={titleId}>

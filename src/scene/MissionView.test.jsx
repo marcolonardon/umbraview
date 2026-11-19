@@ -17,6 +17,7 @@ import { MISSION } from '../engine/config.js'
 import { EARTH_EQUATORIAL_RADIUS_KM } from '../engine/earthSite.js'
 import { systemStateAt } from '../engine/system.js'
 import { useLandingAreas } from '../hooks/useLandingAreas.js'
+import { useLaunchReach } from '../hooks/useLaunchReach.js'
 import { useMission } from '../hooks/useMission.js'
 import { MissionView } from './MissionView.jsx'
 
@@ -24,6 +25,8 @@ vi.mock('@react-three/fiber', () => ({ Canvas: () => <div data-testid="canvas" /
 vi.mock('@react-three/drei', () => ({ Html: () => null, Line: () => null }))
 vi.mock('../hooks/useMission.js', () => ({ useMission: vi.fn() }))
 // o mapa das áreas de pouso roda num Worker, que o jsdom não tem; a conta tem os testes dela (useLandingAreas.test.js)
+// quais bases servem para a janela (card C19): a conta tem os testes dela (mission.test.js, useLaunchReach.test.js)
+vi.mock('../hooks/useLaunchReach.js', () => ({ useLaunchReach: vi.fn(() => null) }))
 vi.mock('../hooks/useLandingAreas.js', () => ({ useLandingAreas: vi.fn(() => ({ status: 'idle', areas: null })) }))
 
 const PARADA = { status: 'idle', mission: null }
@@ -827,5 +830,45 @@ describe('MissionView: o mapa de onde dá para pousar (card C18)', () => {
     renderView({ showLandingAreas: true })
     expect(within(painel()).getByText(missionView.landingAreasReady(30, 24))).toBeInTheDocument()
     useLandingAreas.mockReturnValue({ status: 'idle', areas: null })
+  })
+})
+
+/* Card C19: cada base só lança para alguns lados. A tela diz quais bases alcançam a órbita da
+   janela escolhida, e a missão só sai numa direção que a base permite. */
+describe('MissionView: as bases que servem para a janela (card C19)', () => {
+  const grupoBarrado = () => within(bases()).queryByRole('group', { name: missionView.groupCantReach })
+
+  it('a conta de quais bases servem recebe as bases e a janela escolhida', () => {
+    comTudo({ launchSiteId: null })
+    expect(useLaunchReach).toHaveBeenLastCalledWith(launchSites, JANELAS[0])
+  })
+
+  it('as bases que não alcançam a órbita ficam num grupo próprio da lista, que continua escolhível', () => {
+    useLaunchReach.mockReturnValue({ [KENNEDY.id]: 'blocked', [ALCANTARA.id]: 'ok' })
+    comTudo({ launchSiteId: null })
+    expect(within(grupoBarrado()).getByRole('option', { name: KENNEDY.name })).toBeInTheDocument()
+    expect(within(grupoBarrado()).queryByRole('option', { name: ALCANTARA.name })).not.toBeInTheDocument()
+    useLaunchReach.mockReturnValue(null)
+  })
+
+  it('sem nenhuma base barrada, o grupo não aparece', () => {
+    comTudo({ launchSiteId: null })
+    expect(grupoBarrado()).not.toBeInTheDocument()
+  })
+
+  it('quando a direção do lançamento barra a missão, o aviso diz isso, e o Launch fica desligado', () => {
+    useMission.mockReturnValue({ status: 'error', mission: null, reason: 'azimuth' })
+    comTudo()
+    expect(within(painel()).getByRole('status')).toHaveTextContent(missionView.launchBlocked)
+    expect(lancar()).toBeDisabled()
+  })
+
+  it('nos detalhes, a faixa de direções da base, ou que ela não foi conferida', () => {
+    const comFaixa = launchSites.map((site) => (site.id === KENNEDY.id ? { ...site, azimuthLimits: [{ minDeg: 35, maxDeg: 120 }] } : site))
+    const { unmount } = comTudo({ launchSites: comFaixa })
+    expect(valor(missionView.allowedDirections)).toBe('35° to 120° from north')
+    unmount()
+    comTudo({ launchSites: launchSites.map((site) => ({ ...site, azimuthLimits: null })) })
+    expect(valor(missionView.allowedDirections)).toBe(missionView.directionsNotChecked)
   })
 })

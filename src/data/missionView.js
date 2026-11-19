@@ -16,6 +16,9 @@ export const missionView = {
   launchSitePlaceholder: 'Choose a launch site…',
   groupLaunched: 'Has launched to the Moon',
   groupNotYet: 'No launch to the Moon so far',
+  /* As bases que não lançam, na janela escolhida, na direção que permitem (card C19): ficam num
+     grupo próprio da lista, ainda escolhíveis, para a pessoa ver o motivo. */
+  groupCantReach: "Can't reach this orbit",
   distance: 'Earth–Moon distance',
   distanceValue: (km, earthRadii) => `${Math.round(km).toLocaleString('en-US')} km (${earthRadii.toFixed(1)} Earth radii)`,
   // as 4 casas são as da fonte (GCAT): uns 11 m no chão
@@ -49,6 +52,9 @@ export const missionView = {
   noWindows: (periodDays) => `No landing window here in the next ${periodDays} days. Choose another date or another landing site.`,
   missionLoading: 'Calculating the mission…',
   missionError: 'No path was found from this launch site to this landing window.',
+  // a base só lança para alguns lados, e nenhum horário do dia leva a nave para lá (card C19)
+  launchBlocked:
+    'From this launch site, no launch on that day heads in a direction the site allows. Choose another launch site or another landing window.',
   missionReady: 'Ready to launch.',
 
   /* O painel da missão (card C17): os três passos para montar uma missão, o botão de lançar, a
@@ -152,6 +158,10 @@ export const missionView = {
     landing: 'Final descent to the ground (drawn, not computed)',
   },
   launch: 'Launch',
+  // a faixa de direções que a base permite, do norte para o leste (card C19)
+  allowedDirections: 'Allowed launch directions',
+  directionsValue: (limits) => limits.map(({ minDeg, maxDeg }) => `${minDeg}° to ${maxDeg}° from north`).join(', '),
+  directionsNotChecked: 'Not checked: no source found yet, so no direction is ruled out.',
   launchValue: (when, azimuthDeg) => `${when}, heading ${azimuthDeg.toFixed(0)}° from north`,
   parkingOrbit: 'Parking orbit',
   parkingOrbitValue: (altitudeKm, inclinationDeg) => `${altitudeKm} km up, tilted ${inclinationDeg.toFixed(1)}° to the Earth's equator`,
@@ -173,7 +183,7 @@ export const missionView = {
   pathNote:
     'The solid line is computed: the parking orbit, the crossing, the lunar orbit and the descent are followed step by step under the gravity of the Earth, the Moon and the Sun, each in its real position. Each burn is an instant change of speed; a real burn takes minutes. The dashed lines are drawings, not calculations: the climb from the pad to the parking orbit, and the final descent to the ground.',
   leftOutNote:
-    "Left out of the physics: the Earth's flattening, the air, the pressure of sunlight, the Moon's uneven gravity, what the rocket can lift and the launch directions each range forbids.",
+    "Left out of the physics: the Earth's flattening, the air, the pressure of sunlight, the Moon's uneven gravity and what the rocket can lift. The launch directions each site allows are respected only where we found a source for them.",
   choicesNote: ({ parkingAltitudeKm, lunarOrbitAltitudeKm, crossingDays, lunarOrbitStayHours, landingAimHours }) =>
     `The heights and the times are choices of the model, still provisional: a parking orbit ${parkingAltitudeKm} km up, a crossing of about ${crossingDays} days, a lunar orbit ${lunarOrbitAltitudeKm} km up for about ${lunarOrbitStayHours} hours, and a landing aimed ${landingAimHours} hours after the window opens. The launch is at the time of day that leaves the parking orbit least tilted.`,
 }
