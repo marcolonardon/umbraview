@@ -3,10 +3,15 @@
  * da Lua (CameraRig.jsx). É o CameraControls do Drei, no lugar do OrbitControls: a roda anda em
  * passos suaves, e dá para afastar até a órbita inteira ficar pequena no meio do céu.
  *
- * Só pede quadro enquanto a câmera anda (o próprio CameraControls do Drei chama o invalidate): a
- * vista parada não desenha.
+ * Só pede quadro enquanto a câmera anda: a vista parada não desenha. O CameraControls do Drei pede
+ * o quadro seguinte de dentro de cada quadro em que a câmera andou, mas não pede o primeiro: um
+ * pedido feito aqui (ir a outro alvo, virar para um lado) precisa pedir o quadro ele mesmo. Sem
+ * isto, um pedido que chegava fora de um clique (a missão que acabou de ser calculada) movia a
+ * câmera sem ninguém desenhar, e a tela ficava na vista anterior até alguém mexer nela (card C17,
+ * fase 5).
  */
 import { CameraControls, CameraControlsImpl } from '@react-three/drei'
+import { useThree } from '@react-three/fiber'
 import { useEffect, useRef } from 'react'
 
 /* Quanto os controles demoram para alcançar o destino, em segundos: curto, para responder na hora
@@ -28,11 +33,15 @@ const ORIGIN = Object.freeze([0, 0, 0])
    lado para onde direction aponta (de tamanho 1, a partir do alvo), a distance dele. É o que
    mostra a base de lançamento escolhida na lista (card C13): quem usa só o teclado não tem como
    arrastar a Terra até ela. direction pode mudar a cada quadro (a base gira com a Terra); só a
-   troca da key move a câmera. */
+   troca da key move a câmera.
+   minPolarAngle: até onde a câmera sobe em volta do alvo, em radianos a partir do "para cima" do
+   desenho; 0, o padrão, deixa chegar em cima. A vista do polo sul da Lua (card C17) usa 90°: com o
+   alvo no chão, mais alto que isso a câmera entraria na Lua. */
 export function ZoomControls({
-  minDistance, maxDistance, reducedMotion, target = ORIGIN, targetName = '', distance = null, facing = null,
+  minDistance, maxDistance, reducedMotion, target = ORIGIN, targetName = '', distance = null, facing = null, minPolarAngle = 0,
 }) {
   const controls = useRef(null)
+  const invalidate = useThree((state) => state.invalidate)
   const lastName = useRef(targetName)
   const lastFacing = useRef(null)
   const [x, y, z] = target
@@ -46,7 +55,8 @@ export function ZoomControls({
        sempre um pouco atrás da Terra enquanto ela anda. */
     c.moveTo(x, y, z, switched && !reducedMotion)
     if (switched && distance !== null) c.dollyTo(distance, !reducedMotion)
-  }, [x, y, z, targetName, distance, reducedMotion])
+    invalidate()
+  }, [x, y, z, targetName, distance, reducedMotion, invalidate])
 
   // depois do efeito do alvo, de propósito: quando os dois mudam juntos, este é o que vale
   useEffect(() => {
@@ -58,7 +68,8 @@ export function ZoomControls({
     const [dx, dy, dz] = facing.direction
     const from = distance ?? c.distance
     c.setLookAt(x + dx * from, y + dy * from, z + dz * from, x, y, z, !reducedMotion)
-  }, [facing, x, y, z, distance, reducedMotion])
+    invalidate()
+  }, [facing, x, y, z, distance, reducedMotion, invalidate])
 
   useEffect(() => {
     const c = controls.current
@@ -73,5 +84,5 @@ export function ZoomControls({
     c.draggingSmoothTime = reducedMotion ? 0 : SMOOTH_S / 2
   }, [reducedMotion])
 
-  return <CameraControls ref={controls} minDistance={minDistance} maxDistance={maxDistance} />
+  return <CameraControls ref={controls} minDistance={minDistance} maxDistance={maxDistance} minPolarAngle={minPolarAngle} />
 }

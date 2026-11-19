@@ -1,20 +1,21 @@
-/* A vista da missão (cards C13 e C16): a lista de bases, os números da base escolhida, os botões de
- * câmera, o relógio e a missão simulada. O desenho 3D é do WebGL, que o jsdom não tem: o Canvas
- * vira um substituto vazio, e as contas do desenho têm teste próprio (src/scene/missionScale.test.js,
- * src/scene/missionPath.test.js e src/engine/earthSite.test.js). A ponte da missão (useMission) é
- * trocada: quem diz o que ela entrega é cada teste, e a conta de verdade tem os testes dela
- * (src/engine/mission.test.js e src/hooks/useMission.test.js). */
+/* A vista da missão (cards C13, C16 e C17): a cena em tela cheia, o painel da missão por cima dela
+ * (três etiquetas e o cartão do passo aberto), e, depois do lançamento, a linha do tempo, o relógio
+ * e o resumo. O desenho 3D é do WebGL, que o jsdom não tem: o Canvas vira um substituto vazio, e
+ * as contas do desenho têm teste próprio (src/scene/missionScale.test.js,
+ * src/scene/missionPath.test.js, src/scene/missionPicking.test.js e src/engine/earthSite.test.js).
+ * A ponte da missão (useMission) é trocada: quem diz o que ela entrega é cada teste, e a conta de
+ * verdade tem os testes dela (src/engine/mission.test.js e src/hooks/useMission.test.js). */
 import { fireEvent, render, screen, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 
 import { launchSites } from '../data/launchSites.js'
 import { missionView } from '../data/missionView.js'
+import { sites } from '../data/sites.js'
 import { MISSION } from '../engine/config.js'
 import { EARTH_EQUATORIAL_RADIUS_KM } from '../engine/earthSite.js'
 import { systemStateAt } from '../engine/system.js'
 import { useMission } from '../hooks/useMission.js'
-import { formatUtc } from '../panel/format.js'
 import { MissionView } from './MissionView.jsx'
 
 vi.mock('@react-three/fiber', () => ({ Canvas: () => <div data-testid="canvas" />, useFrame: () => {} }))
@@ -78,6 +79,7 @@ function missaoDaPonte() {
 function renderView(props = {}) {
   const onLaunchSiteChange = vi.fn()
   const onLandingWindowChange = vi.fn()
+  const onLandingSiteChange = vi.fn()
   const view = render(
     <MissionView
       dateUtc={DATA}
@@ -89,124 +91,107 @@ function renderView(props = {}) {
       landingWindows={null}
       landingWindowStartMs={null}
       onLandingWindowChange={onLandingWindowChange}
+      sites={sites}
+      onLandingSiteChange={onLandingSiteChange}
       {...props}
     />,
   )
-  return { onLaunchSiteChange, onLandingWindowChange, ...view }
+  return { onLaunchSiteChange, onLandingWindowChange, onLandingSiteChange, ...view }
 }
 // a vista com tudo escolhido: a base, o local de pouso e as janelas dele
 const comTudo = (props = {}) =>
   renderView({ launchSiteId: KENNEDY.id, landingSite: IM2, skyStatus: 'ready', landingWindows: JANELAS, ...props })
-const janelas = () => screen.getByLabelText(missionView.landingWindowLabel)
-
-const lista = () => screen.getByLabelText(missionView.launchSiteLabel)
 const distanciaNoInstante = (date) => {
   const { distanceKm } = systemStateAt(date.getTime())
   return missionView.distanceValue(distanceKm, distanceKm / EARTH_EQUATORIAL_RADIUS_KM)
 }
 
-describe('MissionView', () => {
-  it('tem nome acessível e diz que está em escala, com a distância da Lua em raios da Terra', () => {
+const IM2_DA_LISTA = sites.find((site) => site.id === 'im-2')
+const painel = () => screen.getByRole('region', { name: missionView.controlTitle })
+// a etiqueta de um passo: o nome dela começa pelo nome do passo, com ou sem o valor escolhido
+const etiqueta = (nome) => within(painel()).getByRole('button', { name: new RegExp(`^${nome}`) })
+const locais = () => within(painel()).getByLabelText(missionView.stepLanding)
+const janelas = () => within(painel()).getByRole('radiogroup', { name: missionView.stepWindow })
+const bases = () => within(painel()).getByLabelText(missionView.stepLaunch)
+const lancar = () => within(painel()).getByRole('button', { name: missionView.launchButton })
+/* Para onde a câmera está virada: 'pole' (o polo sul da Lua), 'earth' ou 'craft' (a nave). A câmera
+   é do WebGL, que o teste não tem; a cena diz o alvo num atributo, e é ele que o teste lê. */
+const camera = () => screen.getByRole('img', { name: /^3D view/ }).dataset.camera
+const detalhes = () => screen.getByText(missionView.detailsSummary).closest('details')
+const valor = (rotulo) => within(detalhes()).getByText(rotulo, { selector: 'dt' }).nextElementSibling.textContent
+const SEGUNDA_JANELA = '1 d 6 h 11 Dec 2026, 06:00 UTC to 12 Dec 2026, 12:00 UTC'
+
+describe('MissionView: a cena', () => {
+  it('tem nome acessível, e os controles ficam fora dela: o que está dentro de uma imagem não é lido', () => {
     renderView()
-    expect(screen.getByRole('img', { name: missionView.label })).toBeInTheDocument()
-    expect(screen.getByText(/are to scale/, { selector: 'p' })).toHaveTextContent(/Moon is \d\d\.\d Earth radii away/)
-    expect(screen.getByText(distanciaNoInstante(DATA))).toBeInTheDocument()
+    const cena = screen.getByRole('img', { name: missionView.label })
+    expect(cena).not.toContainElement(painel())
   })
 
-  it('a lista traz todas as bases, em dois grupos: as que já lançaram à Lua e a que ainda não', () => {
+  it('diz que está em escala, com a distância da Lua em raios da Terra, nos detalhes recolhidos', () => {
     renderView()
-    expect(lista()).toHaveDisplayValue(missionView.launchSitePlaceholder)
-    const jaLancaram = within(lista()).getByRole('group', { name: missionView.groupLaunched })
-    const aindaNao = within(lista()).getByRole('group', { name: missionView.groupNotYet })
-    expect(within(jaLancaram).getAllByRole('option')).toHaveLength(launchSites.length - 1)
-    expect(within(aindaNao).getByRole('option', { name: ALCANTARA.name })).toBeInTheDocument()
-  })
-
-  it('escolher na lista avisa quem guarda a escolha, com o id da base', async () => {
-    const { onLaunchSiteChange } = renderView()
-    await userEvent.selectOptions(lista(), KENNEDY.name)
-    expect(onLaunchSiteChange).toHaveBeenCalledWith(KENNEDY.id)
-  })
-
-  it('sem base escolhida, pede uma; com a base, mostra a coordenada dela e o lançamento à Lua', () => {
-    const base = { dateUtc: DATA, launchSites, onLaunchSiteChange: () => {}, landingSite: null, skyStatus: 'idle', landingWindows: null }
-    const { rerender } = render(<MissionView {...base} launchSiteId={null} />)
-    expect(screen.getByText(missionView.noLaunchSite)).toBeInTheDocument()
-    expect(screen.queryByText(missionView.coordinates)).not.toBeInTheDocument()
-
-    rerender(<MissionView {...base} launchSiteId={KENNEDY.id} />)
-    expect(lista()).toHaveDisplayValue(KENNEDY.name)
-    expect(screen.queryByText(missionView.noLaunchSite)).not.toBeInTheDocument()
-    // as 4 casas da fonte, com o hemisfério por extenso no lugar do sinal
-    expect(screen.getByText('28.6083° N, 80.6041° W')).toBeInTheDocument()
-    // em UTC: o IM-2 saiu no dia 26 pelo relógio da Flórida, e no dia 27 em UTC
-    expect(screen.getByText('IM-2, 27 Feb 2025')).toBeInTheDocument()
-  })
-
-  it('a base que nunca lançou à Lua diz isso, em vez de ficar sem a linha', () => {
-    renderView({ launchSiteId: ALCANTARA.id })
-    expect(screen.getByText('2.3177° S, 44.3680° W')).toBeInTheDocument()
-    expect(screen.getByText(missionView.noLunarLaunch)).toBeInTheDocument()
-  })
-
-  it('a câmera começa na Terra, e só um dos três botões de câmera fica ligado', () => {
-    renderView()
-    const grupo = screen.getByRole('group', { name: missionView.cameraLabel })
-    const botao = (name) => within(grupo).getByRole('button', { name: missionView.camera[name] })
-    expect(botao('earth')).toHaveAttribute('aria-pressed', 'true')
-    fireEvent.click(botao('moon'))
-    expect(botao('moon')).toHaveAttribute('aria-pressed', 'true')
-    expect(botao('earth')).toHaveAttribute('aria-pressed', 'false')
-    fireEvent.click(botao('orbit'))
-    expect(botao('orbit')).toHaveAttribute('aria-pressed', 'true')
-    expect(botao('moon')).toHaveAttribute('aria-pressed', 'false')
-  })
-
-  /* As bases estão na Terra: com a câmera na Lua, escolher uma não mostraria nada. Da vista da
-     órbita inteira a câmera não sai: a pessoa pediu para ver de longe. */
-  it('escolher uma base com a câmera na Lua leva a câmera de volta à Terra', async () => {
-    renderView()
-    const grupo = screen.getByRole('group', { name: missionView.cameraLabel })
-    const botao = (name) => within(grupo).getByRole('button', { name: missionView.camera[name] })
-    fireEvent.click(botao('moon'))
-    await userEvent.selectOptions(lista(), KENNEDY.name)
-    expect(botao('earth')).toHaveAttribute('aria-pressed', 'true')
-
-    fireEvent.click(botao('orbit'))
-    await userEvent.selectOptions(lista(), ALCANTARA.name)
-    expect(botao('orbit')).toHaveAttribute('aria-pressed', 'true')
-  })
-
-  it('o relógio da vista anda pelo período, e a distância da Lua acompanha o instante dele', () => {
-    renderView()
-    fireEvent.change(screen.getByRole('slider', { name: missionView.timeLabel }), { target: { value: '240' } })
-    const dezDiasDepois = new Date('2026-11-24T00:00:00Z')
-    expect(screen.getByText(formatUtc(dezDiasDepois))).toBeInTheDocument()
-    expect(screen.getByText(distanciaNoInstante(dezDiasDepois))).toBeInTheDocument()
-    expect(distanciaNoInstante(dezDiasDepois)).not.toBe(distanciaNoInstante(DATA))
-  })
-
-  it('o botão de tocar começa desligado: a vista não se mexe sozinha', () => {
-    renderView()
-    expect(screen.getByRole('button', { name: missionView.play })).toHaveAttribute('aria-pressed', 'false')
+    expect(detalhes()).not.toHaveAttribute('open')
+    expect(within(detalhes()).getByText(/are to scale/, { selector: 'p' })).toHaveTextContent(/Moon is \d\d\.\d Earth radii away/)
+    expect(valor(missionView.distance)).toBe(distanciaNoInstante(DATA))
   })
 })
 
-describe('MissionView: a missão simulada (card C16)', () => {
-  const texto = (conteudo) => screen.getByText(conteudo)
-
-  it('sem local de pouso na Lua, pede um, e não mostra janela nem pede missão', () => {
-    renderView({ launchSiteId: KENNEDY.id })
-    expect(texto(missionView.noLandingSite)).toBeInTheDocument()
-    expect(screen.queryByLabelText(missionView.landingWindowLabel)).not.toBeInTheDocument()
-    // a ponte recebe a base e mais nada: sem os três, ela fica parada
-    expect(useMission).toHaveBeenLastCalledWith(KENNEDY, null, null)
+/* O painel da missão (card C17). Uma decisão por vez: só o passo aberto tem cartão, e o que já foi
+   escolhido vira uma etiqueta. Na primeira versão os três passos ficavam abertos ao lado da cena,
+   com 29 controles e 631 palavras na tela (medido em 18/11/2026). */
+describe('MissionView: montar a missão, um passo por vez', () => {
+  it('tem três etiquetas, em ordem, e a do passo aberto é a de agora', () => {
+    renderView()
+    const etiquetas = within(painel()).getAllByRole('listitem').map((item) => within(item).getByRole('button'))
+    expect(etiquetas.map((botao) => botao.textContent)).toEqual(['1Landing', '2Window', '3Launch site'])
+    expect(etiquetas.map((botao) => botao.getAttribute('aria-current'))).toEqual(['step', null, null])
   })
 
-  it('enquanto as janelas do local são calculadas, diz isso', () => {
+  it('sem nada escolhido, o cartão pergunta onde pousar, e só essa pergunta', () => {
+    renderView()
+    expect(within(painel()).getByText(missionView.stepLanding)).toBeInTheDocument()
+    expect(locais()).toHaveDisplayValue(missionView.landingSitePlaceholder)
+    expect(within(painel()).getAllByRole('combobox')).toHaveLength(1)
+    expect(within(painel()).getByText(missionView.landingHint)).toBeInTheDocument()
+    expect(within(painel()).queryByRole('button', { name: missionView.launchButton })).not.toBeInTheDocument()
+  })
+
+  /* O jeito principal de escolher é na cena: um pino, ou qualquer ponto da Lua. A lista continua
+     ali, recolhida, porque é por ela que quem usa teclado escolhe: a cena não recebe foco. */
+  it('as listas de locais e de bases ficam recolhidas atrás de "escolher numa lista"', () => {
+    const { unmount } = renderView()
+    const recolhida = (lista) => lista.closest('details')
+    expect(recolhida(locais())).not.toHaveAttribute('open')
+    expect(within(recolhida(locais())).getByText(missionView.chooseFromList)).toBeInTheDocument()
+    unmount()
+    comTudo({ launchSiteId: null })
+    expect(recolhida(bases())).not.toHaveAttribute('open')
+  })
+
+  it('a lista de locais traz os conhecidos, e escolher avisa quem guarda a escolha', async () => {
+    const { onLandingSiteChange } = renderView()
+    expect(within(locais()).getAllByRole('option')).toHaveLength(sites.length + 1)
+    await userEvent.selectOptions(locais(), IM2_DA_LISTA.name)
+    expect(onLandingSiteChange).toHaveBeenCalledWith(IM2_DA_LISTA)
+  })
+
+  it('com o local escolhido, a etiqueta mostra o nome dele; o ponto clicado na Lua aparece como o seu ponto', () => {
+    const { unmount } = renderView({ landingSite: IM2_DA_LISTA, skyStatus: 'loading' })
+    expect(etiqueta(missionView.chipLanding)).toHaveTextContent(IM2_DA_LISTA.name)
+    unmount()
+    renderView({ landingSite: { lat: -88.5, lon: 120.25 }, skyStatus: 'loading' })
+    expect(etiqueta(missionView.chipLanding)).toHaveTextContent(missionView.customLandingSite)
+    fireEvent.click(etiqueta(missionView.chipLanding))
+    expect(locais()).toHaveDisplayValue(missionView.customLandingSite)
+    // a coordenada do ponto fica nos detalhes
+    expect(valor(missionView.landingSiteLabel)).toBe('88.5000° S, 120.2500° E')
+  })
+
+  it('com o local, o passo aberto é o da janela, e ele diz que as janelas estão sendo calculadas', () => {
     renderView({ launchSiteId: KENNEDY.id, landingSite: IM2, skyStatus: 'loading' })
-    expect(texto(missionView.windowsLoading)).toBeInTheDocument()
-    expect(screen.queryByText(missionView.noLandingSite)).not.toBeInTheDocument()
+    expect(etiqueta(missionView.chipWindow)).toHaveAttribute('aria-current', 'step')
+    expect(within(painel()).getByRole('status')).toHaveTextContent(missionView.windowsLoading)
+    expect(within(painel()).queryByRole('combobox')).not.toBeInTheDocument()
     expect(useMission).toHaveBeenLastCalledWith(KENNEDY, IM2, null)
   })
 
@@ -214,37 +199,61 @@ describe('MissionView: a missão simulada (card C16)', () => {
      céu do novo é calculado, nenhuma janela vai para a ponte, mesmo que as antigas ainda cheguem. */
   it('com o céu ainda sendo calculado, janelas que sobraram de antes não entram na lista nem na ponte', () => {
     renderView({ launchSiteId: KENNEDY.id, landingSite: IM2, skyStatus: 'loading', landingWindows: JANELAS })
-    expect(texto(missionView.windowsLoading)).toBeInTheDocument()
-    expect(screen.queryByLabelText(missionView.landingWindowLabel)).not.toBeInTheDocument()
+    expect(within(painel()).getByRole('status')).toHaveTextContent(missionView.windowsLoading)
+    expect(within(painel()).queryByRole('combobox')).not.toBeInTheDocument()
     expect(useMission).toHaveBeenLastCalledWith(KENNEDY, IM2, null)
   })
 
-  it('se a conta das janelas falhou, diz que não há missão para simular', () => {
-    renderView({ launchSiteId: KENNEDY.id, landingSite: IM2, skyStatus: 'error' })
-    expect(texto(missionView.windowsError)).toBeInTheDocument()
-  })
-
-  it('se o local não tem janela de pouso no período, diz isso, e não mostra a lista vazia', () => {
+  it('se a conta das janelas falhou, ou se o local não tem janela no período, o passo da janela diz isso', () => {
+    const { unmount } = renderView({ launchSiteId: KENNEDY.id, landingSite: IM2, skyStatus: 'error' })
+    expect(within(painel()).getByRole('status')).toHaveTextContent(missionView.windowsError)
+    unmount()
     comTudo({ landingWindows: [] })
-    expect(texto(missionView.noWindows)).toBeInTheDocument()
-    expect(screen.queryByLabelText(missionView.landingWindowLabel)).not.toBeInTheDocument()
+    expect(etiqueta(missionView.chipWindow)).toHaveAttribute('aria-current', 'step')
+    expect(within(painel()).getByRole('status')).toHaveTextContent('No landing window here in the next 30 days. Choose another landing site.')
     expect(useMission).toHaveBeenLastCalledWith(KENNEDY, IM2, null)
   })
 
-  it('com janelas, a lista traz todas, com o começo, o fim e a duração, e a primeira já vem escolhida', () => {
+  it('a etiqueta da janela, aberta sem local de pouso, pede o local primeiro', () => {
+    renderView()
+    fireEvent.click(etiqueta(missionView.chipWindow))
+    expect(within(painel()).getByRole('status')).toHaveTextContent(missionView.windowWaiting)
+  })
+
+  it('com janelas, a primeira já vem escolhida, a etiqueta mostra o dia e a duração, e o painel segue para a base', () => {
+    comTudo({ launchSiteId: null })
+    expect(etiqueta(missionView.chipWindow)).toHaveTextContent('5 Dec 2026 · 3 d')
+    expect(etiqueta(missionView.chipLaunch)).toHaveAttribute('aria-current', 'step')
+    expect(bases()).toHaveDisplayValue(missionView.launchSitePlaceholder)
+    expect(within(painel()).getByText(missionView.launchHint)).toBeInTheDocument()
+    expect(useMission).toHaveBeenLastCalledWith(null, IM2, JANELAS[0])
+  })
+
+  /* As janelas são cartões, e não uma lista: são duas ou três, e na lista o texto de cada uma
+     (duas datas e a duração) ficava cortado. Cada cartão é um botão de rádio de verdade, para as
+     setas do teclado funcionarem. */
+  it('reabrindo o passo da janela, cada janela é um cartão, com a duração em destaque e as duas datas', () => {
     comTudo()
-    const opcoes = within(janelas()).getAllByRole('option')
-    expect(opcoes.map((opcao) => opcao.textContent)).toEqual([
-      '5 Dec 2026, 00:00 UTC to 8 Dec 2026, 00:00 UTC (3 d)',
-      '11 Dec 2026, 06:00 UTC to 12 Dec 2026, 12:00 UTC (1 d 6 h)',
-    ])
-    expect(janelas()).toHaveDisplayValue(opcoes[0].textContent)
-    expect(useMission).toHaveBeenLastCalledWith(KENNEDY, IM2, JANELAS[0])
+    fireEvent.click(etiqueta(missionView.chipWindow))
+    const cartoes = within(janelas()).getAllByRole('radio')
+    expect(cartoes).toHaveLength(2)
+    expect(cartoes[0]).toHaveAccessibleName('3 d 5 Dec 2026, 00:00 UTC to 8 Dec 2026, 00:00 UTC')
+    expect(cartoes[1]).toHaveAccessibleName(SEGUNDA_JANELA)
+    expect(cartoes[0]).toBeChecked()
+    expect(cartoes[1]).not.toBeChecked()
+  })
+
+  it('a janela cortada pelo período leva o "≥": ela dura mais do que a parte dentro dele', () => {
+    const cortada = [{ ...JANELAS[0], startsBeforePeriod: true }, JANELAS[1]]
+    comTudo({ landingWindows: cortada })
+    fireEvent.click(etiqueta(missionView.chipWindow))
+    expect(within(janelas()).getAllByRole('radio')[0]).toHaveAccessibleName('≥ 3 d 5 Dec 2026, 00:00 UTC to 8 Dec 2026, 00:00 UTC')
   })
 
   it('escolher outra janela avisa quem guarda a escolha, e a janela guardada é a que vai para a ponte', async () => {
     const { onLandingWindowChange, unmount } = comTudo()
-    await userEvent.selectOptions(janelas(), '11 Dec 2026, 06:00 UTC to 12 Dec 2026, 12:00 UTC (1 d 6 h)')
+    fireEvent.click(etiqueta(missionView.chipWindow))
+    await userEvent.click(within(janelas()).getByRole('radio', { name: SEGUNDA_JANELA }))
     expect(onLandingWindowChange).toHaveBeenCalledWith(JANELAS[1].startUtc.getTime())
     unmount()
 
@@ -257,140 +266,404 @@ describe('MissionView: a missão simulada (card C16)', () => {
     expect(useMission).toHaveBeenLastCalledWith(KENNEDY, IM2, JANELAS[0])
   })
 
-  it('com o local e a janela mas sem base, pede a base, e não diz que está calculando', () => {
-    comTudo({ launchSiteId: null })
-    expect(texto(missionView.noLaunchSite)).toBeInTheDocument()
-    expect(screen.queryByText(missionView.missionLoading)).not.toBeInTheDocument()
-    expect(useMission).toHaveBeenLastCalledWith(null, IM2, JANELAS[0])
+  it('a lista de bases traz todas, em dois grupos, e escolher avisa quem guarda a escolha, com o id', async () => {
+    const { onLaunchSiteChange } = comTudo({ launchSiteId: null })
+    const jaLancaram = within(bases()).getByRole('group', { name: missionView.groupLaunched })
+    const aindaNao = within(bases()).getByRole('group', { name: missionView.groupNotYet })
+    expect(within(jaLancaram).getAllByRole('option')).toHaveLength(launchSites.length - 1)
+    expect(within(aindaNao).getByRole('option', { name: ALCANTARA.name })).toBeInTheDocument()
+    await userEvent.selectOptions(bases(), KENNEDY.name)
+    expect(onLaunchSiteChange).toHaveBeenCalledWith(KENNEDY.id)
   })
 
-  it('enquanto a missão é calculada, diz isso, num lugar que o leitor de tela anuncia', () => {
+  it('depois de reabrir um passo e escolher, o painel volta ao primeiro passo que falta', async () => {
+    comTudo({ launchSiteId: null })
+    fireEvent.click(etiqueta(missionView.chipLanding))
+    expect(etiqueta(missionView.chipLanding)).toHaveAttribute('aria-current', 'step')
+    await userEvent.selectOptions(locais(), IM2_DA_LISTA.name)
+    expect(etiqueta(missionView.chipLaunch)).toHaveAttribute('aria-current', 'step')
+  })
+
+  /* A câmera vai aonde se escolhe. Antes havia um link "Show the Moon" e outro "Show the Earth", e
+     depois quatro botões de câmera: era a pessoa que tinha que saber para onde olhar. */
+  /* Fase 5: quem escolhe pela lista, com o teclado, está com o foco nela. A escolha fecha o passo,
+     a lista sai da página, e o foco caía no corpo da página: o Tab seguinte recomeçava do topo, e
+     o leitor de tela não dizia que a pergunta tinha mudado. */
+  it('escolher numa lista não perde o foco: ele vai para a pergunta do passo seguinte', () => {
+    const { rerender } = renderView()
+    locais().focus()
+    rerender(
+      <MissionView
+        dateUtc={DATA} launchSites={launchSites} launchSiteId={null} onLaunchSiteChange={() => {}}
+        landingSite={IM2} skyStatus="ready" landingWindows={JANELAS} landingWindowStartMs={null} onLandingWindowChange={() => {}}
+        sites={sites} onLandingSiteChange={() => {}}
+      />,
+    )
+    expect(within(painel()).getByText(missionView.stepLaunch)).toHaveFocus()
+  })
+
+  it('no passo do lançamento, que não tem pergunta, o foco perdido vai para o aviso do cartão', () => {
+    useMission.mockReturnValue({ status: 'ready', mission: missaoDaPonte() })
+    const { rerender } = comTudo({ launchSiteId: null })
+    bases().focus()
+    rerender(
+      <MissionView
+        dateUtc={DATA} launchSites={launchSites} launchSiteId={KENNEDY.id} onLaunchSiteChange={() => {}}
+        landingSite={IM2} skyStatus="ready" landingWindows={JANELAS} landingWindowStartMs={null} onLandingWindowChange={() => {}}
+        sites={sites} onLandingSiteChange={() => {}}
+      />,
+    )
+    expect(within(painel()).getByRole('status')).toHaveFocus()
+    expect(within(painel()).getByRole('status')).toHaveTextContent(missionView.missionReady)
+  })
+
+  it('quando o passo muda e o foco está em outro controle, ele fica onde está', () => {
+    const { rerender } = renderView()
+    etiqueta(missionView.chipWindow).focus()
+    rerender(
+      <MissionView
+        dateUtc={DATA} launchSites={launchSites} launchSiteId={null} onLaunchSiteChange={() => {}}
+        landingSite={IM2} skyStatus="ready" landingWindows={JANELAS} landingWindowStartMs={null} onLandingWindowChange={() => {}}
+        sites={sites} onLandingSiteChange={() => {}}
+      />,
+    )
+    expect(etiqueta(missionView.chipWindow)).toHaveFocus()
+  })
+
+  it('a câmera acompanha o passo: o polo sul da Lua para o pouso, a Terra para a base', () => {
+    const { unmount } = renderView()
+    expect(camera()).toBe('pole')
+    unmount()
+    comTudo({ launchSiteId: null })
+    expect(camera()).toBe('earth')
+    fireEvent.click(etiqueta(missionView.chipLanding))
+    expect(camera()).toBe('pole')
+    fireEvent.click(etiqueta(missionView.chipLaunch))
+    expect(camera()).toBe('earth')
+  })
+
+  it('planejando não há botão de câmera nenhum: ela vai sozinha, e o mouse gira e aproxima', () => {
+    comTudo()
+    expect(screen.queryByRole('button', { name: /camera/i })).not.toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: 'Earth' })).not.toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: 'Moon' })).not.toBeInTheDocument()
+  })
+
+  it('planejando não há mapa do trajeto: a linha da missão ainda é uma prévia', () => {
+    useMission.mockReturnValue({ status: 'ready', mission: missaoDaPonte() })
+    comTudo()
+    expect(screen.queryByRole('img', { name: missionView.mapLabel })).not.toBeInTheDocument()
+  })
+
+  it('planejando não há relógio nem linha do tempo: a vista não se mexe sozinha', () => {
+    comTudo()
+    expect(screen.queryByRole('slider')).not.toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: missionView.play })).not.toBeInTheDocument()
+    expect(screen.queryByRole('list', { name: missionView.timelineLabel })).not.toBeInTheDocument()
+  })
+})
+
+describe('MissionView: o lançamento', () => {
+  it('com os três passos feitos, o cartão é o do lançamento; enquanto a missão é calculada, o botão espera', () => {
     useMission.mockReturnValue({ status: 'loading', mission: null })
     comTudo()
-    expect(screen.getByRole('status')).toHaveTextContent(missionView.missionLoading)
-    expect(screen.queryByText(missionView.launch)).not.toBeInTheDocument()
+    expect(within(painel()).getByRole('status')).toHaveTextContent(missionView.missionLoading)
+    expect(lancar()).toBeDisabled()
+    expect(within(painel()).queryByRole('combobox')).not.toBeInTheDocument()
   })
 
-  it('se nenhum caminho foi achado, diz isso, e não mostra número nenhum da missão', () => {
+  it('se nenhum caminho foi achado, o cartão diz isso, e o botão continua desligado', () => {
     useMission.mockReturnValue({ status: 'error', mission: null })
     comTudo()
-    expect(screen.getByRole('status')).toHaveTextContent(missionView.missionError)
-    expect(screen.queryByText(missionView.launch)).not.toBeInTheDocument()
+    expect(within(painel()).getByRole('status')).toHaveTextContent(missionView.missionError)
+    expect(lancar()).toBeDisabled()
   })
 
-  describe('com a missão pronta', () => {
-    const missao = missaoDaPonte()
-    beforeEach(() => {
-      useMission.mockReturnValue({ status: 'ready', mission: missao })
-    })
+  it('com a missão pronta, diz que está pronta para lançar, e o nome da cena passa a falar da linha', () => {
+    useMission.mockReturnValue({ status: 'ready', mission: missaoDaPonte() })
+    comTudo()
+    expect(within(painel()).getByRole('status')).toHaveTextContent(missionView.missionReady)
+    expect(lancar()).toBeEnabled()
+    expect(screen.getByRole('img', { name: missionView.labelWithMission })).toBeInTheDocument()
+  })
 
-    it('diz de onde para onde é a missão, e o nome da cena passa a falar da linha', () => {
-      comTudo()
-      expect(screen.getByRole('status')).toHaveTextContent(missionView.missionReady(KENNEDY.name, IM2.name))
-      expect(screen.getByRole('img', { name: missionView.labelWithMission })).toBeInTheDocument()
-    })
+  it('com a missão na tela, um selo diz que é uma missão de referência, e o texto abre no clique', () => {
+    const { unmount } = comTudo()
+    expect(screen.queryByText(missionView.referenceBadge)).not.toBeInTheDocument()
+    unmount()
+    useMission.mockReturnValue({ status: 'ready', mission: missaoDaPonte() })
+    comTudo()
+    const selo = screen.getByText(missionView.referenceBadge).closest('details')
+    expect(selo).not.toHaveAttribute('open')
+    expect(within(selo).getByText(missionView.referenceNote)).toBeInTheDocument()
+  })
+})
 
-    it('os números na tela são os que a ponte entregou, na ordem do voo', () => {
-      comTudo()
-      const valor = (rotulo) => screen.getByText(rotulo, { selector: 'dt' }).nextElementSibling.textContent
-      expect(valor(missionView.launch)).toBe('30 Nov 2026, 22:00 UTC, heading 88° from north')
-      expect(valor(missionView.parkingOrbit)).toBe("185 km up, tilted 28.5° to the Earth's equator")
-      expect(valor(missionView.tli)).toBe('30 Nov 2026, 23:00 UTC, a burn of 3.14 km/s')
-      expect(valor(missionView.crossing)).toBe('4 d')
-      expect(valor(missionView.loi)).toBe('4 Dec 2026, 23:00 UTC, a burn of 0.84 km/s')
-      expect(valor(missionView.lunarOrbit)).toBe("100 km up, tilted 84.9° to the Moon's equator, for 12 h")
-      expect(valor(missionView.descent)).toBe('5 Dec 2026, 11:00 UTC, a burn of 19 m/s')
-      expect(valor(missionView.landing)).toBe('5 Dec 2026, 12:09 UTC')
-      // as alturas das duas órbitas são as do modelo, e não números soltos na tela
-      expect(MISSION.parkingAltitudeKm).toBe(185)
-      expect(MISSION.lunarOrbitAltitudeKm).toBe(100)
-    })
+/* O painel de voo (card C17, fase 3): um trilho só para o tempo, da Terra à Lua, no lugar das seis
+   fases mais o cursor; um botão para tocar e pausar; a velocidade; e um cartão com a nave em
+   números. Antes eram 15 controles à mostra durante o voo. */
+describe('MissionView: voando', () => {
+  const missao = missaoDaPonte()
+  beforeEach(() => {
+    useMission.mockReturnValue({ status: 'ready', mission: missao })
+  })
+  const trilho = () => screen.getByRole('slider', { name: missionView.progressLabel })
+  const irPara = (lugar) => fireEvent.change(trilho(), { target: { value: String(lugar) } })
+  // lança e para o relógio, para o teste olhar a tela parada
+  const voar = (props) => {
+    const view = comTudo(props)
+    fireEvent.click(lancar())
+    fireEvent.click(screen.getByRole('button', { name: missionView.pause }))
+    irPara(0)
+    return view
+  }
+  const fases = () => within(screen.getByRole('list', { name: missionView.timelineLabel })).getAllByRole('listitem')
+  const faseDeAgora = () => fases().filter((fase) => fase.getAttribute('aria-current') === 'step').map((fase) => fase.textContent)
+  const voo = () => screen.getByRole('group', { name: missionView.flightStatus })
+  const agora = () => valor(missionView.craftNow)
 
-    it('diz o que é conta, o que é desenho, o que ficou de fora e quais são as escolhas do modelo', () => {
-      comTudo()
-      expect(texto(missionView.referenceNote)).toBeInTheDocument()
-      expect(texto(missionView.pathNote)).toBeInTheDocument()
-      expect(texto(missionView.leftOutNote)).toBeInTheDocument()
-      expect(texto(missionView.choicesNote(MISSION))).toBeInTheDocument()
-      expect(missionView.choicesNote(MISSION)).toMatch(/185 km up.*about 4 days.*100 km up for about 12 hours.*12 hours after/)
-    })
+  it('lançar tira o painel da frente, toca o relógio do lançamento e põe a câmera na nave', () => {
+    comTudo()
+    fireEvent.click(lancar())
+    expect(screen.queryByRole('region', { name: missionView.controlTitle })).not.toBeInTheDocument()
+    expect(screen.getByRole('button', { name: missionView.pause })).toHaveAttribute('aria-pressed', 'true')
+    expect(camera()).toBe('craft')
+    // a missão inteira leva 45 s: logo depois do clique o trilho ainda está no começo
+    expect(Number(trilho().value)).toBeLessThan(60)
+    expect(screen.getByRole('button', { name: missionView.changeMission })).toBeInTheDocument()
+  })
 
-    it('o relógio passa a cobrir a missão: começa no lançamento, parado, e vai até o pouso', () => {
-      comTudo()
-      const cursor = screen.getByRole('slider', { name: missionView.missionTimeLabel })
-      expect(screen.queryByRole('slider', { name: missionView.timeLabel })).not.toBeInTheDocument()
-      expect(texto(formatUtc(missao.launchUtc))).toBeInTheDocument()
-      expect(screen.getByRole('button', { name: missionView.play })).toHaveAttribute('aria-pressed', 'false')
-      // de 6 em 6 minutos; a missão dura 110 h 9 min, e o último passo cai no pouso ou logo depois
-      expect(cursor).toHaveAttribute('max', '1102')
-      fireEvent.change(cursor, { target: { value: '1102' } })
-      expect(texto('5 Dec 2026, 12:12 UTC')).toBeInTheDocument()
-    })
+  /* Fase 5: o botão Launch sai da página quando é apertado, e o foco ia junto. Agora vai para o
+     botão de tocar e pausar, que é o que a pessoa quer ter à mão; e "mudar a missão" e "lançar de
+     novo", que também somem ao serem apertados, devolvem o foco do mesmo jeito. */
+  it('lançar leva o foco ao botão de pausar, e "mudar a missão" o devolve ao cartão do painel', () => {
+    comTudo()
+    lancar().focus()
+    fireEvent.click(lancar())
+    expect(screen.getByRole('button', { name: missionView.pause })).toHaveFocus()
+    const mudar = screen.getByRole('button', { name: missionView.changeMission })
+    mudar.focus()
+    fireEvent.click(mudar)
+    expect(within(painel()).getByRole('status')).toHaveFocus()
+  })
 
-    /* A hora 240 do período não quer dizer nada na missão, que dura umas 110: quando a missão
-       chega, o relógio recomeça do lançamento, parado. */
-    it('se o relógio do período já tinha andado, a missão chegando o leva de volta ao começo dela', () => {
-      useMission.mockReturnValue(PARADA)
-      const tudo = {
-        dateUtc: DATA, launchSites, launchSiteId: KENNEDY.id, onLaunchSiteChange: () => {},
-        landingSite: IM2, skyStatus: 'ready', landingWindows: JANELAS, landingWindowStartMs: null, onLandingWindowChange: () => {},
-      }
-      const { rerender } = render(<MissionView {...tudo} />)
-      fireEvent.change(screen.getByRole('slider', { name: missionView.timeLabel }), { target: { value: '240' } })
-      expect(texto(formatUtc(new Date('2026-11-24T00:00:00Z')))).toBeInTheDocument()
+  it('lançar de novo, do resumo, leva o foco de volta ao botão de pausar', () => {
+    voar()
+    irPara(900)
+    const deNovo = screen.getByRole('button', { name: missionView.launchAgain })
+    deNovo.focus()
+    fireEvent.click(deNovo)
+    expect(screen.getByRole('button', { name: missionView.pause })).toHaveFocus()
+  })
 
-      useMission.mockReturnValue({ status: 'ready', mission: missao })
-      rerender(<MissionView {...tudo} />)
-      expect(screen.getByRole('slider', { name: missionView.missionTimeLabel })).toHaveValue('0')
-      expect(texto(formatUtc(missao.launchUtc))).toBeInTheDocument()
-    })
+  /* O cartão de voo não é um aviso: tocando, os números mudam a cada quadro, e o leitor de tela
+     falaria sem parar. O que ele ouve é a troca de fase, seis vezes numa missão, e o pouso. */
+  it('o leitor de tela é avisado quando a fase muda e quando a nave pousa, e não a cada quadro', () => {
+    voar()
+    const aviso = () => screen.getByRole('status')
+    expect(aviso()).toHaveTextContent(/^Climb$/)
+    irPara(350)
+    expect(aviso()).toHaveTextContent(/^Crossing$/)
+    irPara(360)
+    expect(aviso()).toHaveTextContent(/^Crossing$/)
+    irPara(900)
+    expect(aviso()).toHaveTextContent(missionView.completeTitle)
+  })
 
-    it('o relógio leva a nave pelas fases da missão, sem pedir outra conta', () => {
-      comTudo()
-      const cursor = screen.getByRole('slider', { name: missionView.missionTimeLabel })
-      const agora = () => screen.getByText(missionView.craftNow, { selector: 'dt' }).nextElementSibling.textContent
-      expect(agora()).toBe(missionView.phases.ascent)
-      fireEvent.change(cursor, { target: { value: '5' } })
-      expect(agora()).toBe(missionView.phases.parking)
-      fireEvent.change(cursor, { target: { value: '200' } })
-      expect(agora()).toBe(missionView.phases.crossing)
-      expect(texto('1 Dec 2026, 18:00 UTC')).toBeInTheDocument()
-      fireEvent.change(cursor, { target: { value: '1000' } })
-      expect(agora()).toBe(missionView.phases.lunarOrbit)
-      fireEvent.change(cursor, { target: { value: '1102' } })
-      expect(agora()).toBe(missionView.phases.landing)
-      // a cada redesenho a ponte recebe a mesma base, o mesmo local e a mesma janela: a conta não é refeita
-      expect(useMission.mock.calls.length).toBeGreaterThan(4)
-      for (const pedido of useMission.mock.calls) expect(pedido).toEqual([KENNEDY, IM2, JANELAS[0]])
-    })
+  it('um botão só toca e pausa', () => {
+    voar()
+    const tocar = screen.getByRole('button', { name: missionView.play })
+    expect(tocar).toHaveAttribute('aria-pressed', 'false')
+    fireEvent.click(tocar)
+    expect(screen.getByRole('button', { name: missionView.pause })).toHaveAttribute('aria-pressed', 'true')
+    expect(screen.queryByRole('button', { name: missionView.play })).not.toBeInTheDocument()
+  })
 
-    it('ganha o botão de câmera da nave, que só existe com a missão', () => {
-      const grupo = () => screen.getByRole('group', { name: missionView.cameraLabel })
-      const { unmount } = comTudo()
-      const nave = within(grupo()).getByRole('button', { name: missionView.camera.craft })
-      fireEvent.click(nave)
-      expect(nave).toHaveAttribute('aria-pressed', 'true')
-      unmount()
+  /* Voando, a câmera se põe sozinha, de um jeito por fase. Um botão só a solta: com a câmera livre
+     a pessoa gira e aproxima à vontade, e a câmera continua indo junto com a nave. Eram quatro
+     botões de câmera. */
+  it('um botão só solta a câmera, e cada lançamento a prende de novo', () => {
+    voar()
+    const livre = () => screen.getByRole('button', { name: missionView.freeCamera })
+    expect(livre()).toHaveAttribute('aria-pressed', 'false')
+    fireEvent.click(livre())
+    expect(livre()).toHaveAttribute('aria-pressed', 'true')
+    expect(camera()).toBe('craft')
+    irPara(900)
+    fireEvent.click(screen.getByRole('button', { name: missionView.launchAgain }))
+    expect(livre()).toHaveAttribute('aria-pressed', 'false')
+  })
 
-      useMission.mockReturnValue(PARADA)
-      comTudo()
-      expect(within(grupo()).queryByRole('button', { name: missionView.camera.craft })).not.toBeInTheDocument()
-    })
+  it('o mapa do trajeto fica à mostra durante o voo, com nome para o leitor de tela e legenda', () => {
+    voar()
+    expect(screen.getByRole('img', { name: missionView.mapLabel })).toBeInTheDocument()
+    expect(screen.getByText(missionView.mapCaption)).toBeInTheDocument()
+  })
 
-    it('se a missão some com a câmera na nave, a câmera volta para a Terra e o relógio, para o período', () => {
-      const { rerender } = comTudo()
-      const grupo = screen.getByRole('group', { name: missionView.cameraLabel })
-      fireEvent.click(within(grupo).getByRole('button', { name: missionView.camera.craft }))
-      useMission.mockReturnValue({ status: 'loading', mission: null })
-      rerender(
-        <MissionView
-          dateUtc={DATA} launchSites={launchSites} launchSiteId={ALCANTARA.id} onLaunchSiteChange={() => {}}
-          landingSite={IM2} skyStatus="ready" landingWindows={JANELAS} landingWindowStartMs={null} onLandingWindowChange={() => {}}
-        />,
-      )
-      expect(within(grupo).getByRole('button', { name: missionView.camera.earth })).toHaveAttribute('aria-pressed', 'true')
-      expect(screen.getByRole('slider', { name: missionView.timeLabel })).toBeInTheDocument()
-      expect(texto(formatUtc(DATA))).toBeInTheDocument()
-    })
+  it('a velocidade tem dois valores, e o botão dela diz qual está ligado', () => {
+    voar()
+    const rapido = screen.getByRole('button', { name: missionView.fastLabel })
+    expect(rapido).toHaveAttribute('aria-pressed', 'false')
+    fireEvent.click(rapido)
+    expect(rapido).toHaveAttribute('aria-pressed', 'true')
+  })
+
+  /* O trilho não é uma régua de tempo: cada fase tem o seu pedaço. Os pesos são 1, 1, 3, 2, 1 e 1,
+     em 900 passos: a subida vai de 0 a 100, a órbita de espera até 200, a travessia até 500, a
+     órbita lunar até 700, a descida até 800 e o pouso até 900. */
+  it('o trilho leva a nave pelas fases, cada uma no seu pedaço, sem pedir outra conta', () => {
+    voar()
+    expect(trilho()).toHaveAttribute('max', '900')
+    expect(agora()).toBe(missionView.phases.ascent)
+    irPara(100)
+    expect(agora()).toBe(missionView.phases.parking)
+    irPara(200)
+    expect(agora()).toBe(missionView.phases.crossing)
+    irPara(500)
+    expect(agora()).toBe(missionView.phases.lunarOrbit)
+    irPara(700)
+    expect(agora()).toBe(missionView.phases.descent)
+    irPara(800)
+    expect(agora()).toBe(missionView.phases.landing)
+    // a cada redesenho a ponte recebe a mesma base, o mesmo local e a mesma janela: a conta não é refeita
+    expect(useMission.mock.calls.length).toBeGreaterThan(4)
+    for (const pedido of useMission.mock.calls) expect(pedido).toEqual([KENNEDY, IM2, JANELAS[0]])
+  })
+
+  it('embaixo do trilho ficam os nomes das seis fases, em ordem, com a de agora marcada; não são botões', () => {
+    voar()
+    expect(fases().map((fase) => fase.textContent)).toEqual(['Climb', 'Parking orbit', 'Crossing', 'Lunar orbit', 'Descent', 'Landing'])
+    expect(faseDeAgora()).toEqual(['Climb'])
+    irPara(350)
+    expect(faseDeAgora()).toEqual(['Crossing'])
+    expect(within(screen.getByRole('list', { name: missionView.timelineLabel })).queryByRole('button')).not.toBeInTheDocument()
+  })
+
+  it('o leitor de tela ouve no trilho a fase e o tempo de missão, e não um número de 0 a 900', () => {
+    voar()
+    irPara(200)
+    expect(trilho()).toHaveAttribute('aria-valuetext', 'Crossing, T+ 1 h 00 min')
+  })
+
+  /* A missão da ponte destes testes tem dois pontos por trecho: de 7000 km num eixo a 7000 km no
+     outro. A altura e a velocidade do cartão saem desses pontos. */
+  it('o cartão de voo mostra a fase, o tempo de missão, a altura e a velocidade, tirados do caminho', () => {
+    voar()
+    irPara(200)
+    // o começo da travessia: 1 hora depois do lançamento, a 7000 km do centro da Terra (622 km do chão)
+    expect(voo()).toHaveTextContent('Crossing')
+    expect(voo()).toHaveTextContent('T+ 1 h 00 min')
+    expect(voo()).toHaveTextContent('622 km above the Earth')
+    // 9899 km em 96 horas
+    expect(voo()).toHaveTextContent('0.03 km/s')
+    irPara(500)
+    // a chegada à Lua: 97 horas depois do lançamento; a altura passa a ser sobre a Lua
+    expect(voo()).toHaveTextContent('Lunar orbit')
+    expect(voo()).toHaveTextContent('T+ 4 d 01 h')
+    expect(voo()).toHaveTextContent('5,263 km above the Moon')
+    expect(voo()).toHaveTextContent('0.23 km/s')
+  })
+
+  it('nos dois trechos desenhados o cartão diz que é desenho, e não mostra altura nem velocidade', () => {
+    voar()
+    irPara(50)
+    expect(voo()).toHaveTextContent('Climb')
+    expect(voo()).toHaveTextContent(missionView.drawnValue)
+    expect(voo()).not.toHaveTextContent('km')
+    irPara(850)
+    expect(voo()).toHaveTextContent(missionView.drawnValue)
+  })
+
+  it('no pouso, e só nele, mostra o resumo, com o tempo total e a soma das três queimas', () => {
+    voar()
+    expect(screen.queryByText(missionView.completeTitle)).not.toBeInTheDocument()
+    // na descida, a minutos do pouso, a missão ainda não terminou
+    irPara(899)
+    expect(screen.queryByText(missionView.completeTitle)).not.toBeInTheDocument()
+    irPara(900)
+    const resumo = screen.getByRole('region', { name: missionView.completeTitle })
+    const total = (rotulo) => within(resumo).getByText(rotulo, { selector: 'dt' }).nextElementSibling.textContent
+    // 110 h 9 min do lançamento ao pouso; 3,1408 + 0,8379 + 0,0195 km/s
+    expect(total(missionView.totalTime)).toBe('4 d 14 h')
+    expect(total(missionView.totalDeltaV)).toBe('4.00 km/s')
+    expect(voo()).toHaveTextContent('T+ 4 d 14 h')
+  })
+
+  it('do resumo dá para lançar de novo: o trilho volta ao começo, tocando', () => {
+    voar()
+    irPara(900)
+    fireEvent.click(screen.getByRole('button', { name: missionView.launchAgain }))
+    expect(Number(trilho().value)).toBeLessThan(60)
+    expect(screen.getByRole('button', { name: missionView.pause })).toHaveAttribute('aria-pressed', 'true')
+    expect(screen.queryByText(missionView.completeTitle)).not.toBeInTheDocument()
+  })
+
+  it('"mudar a missão" volta ao painel, com a missão ainda montada, e o trilho sai da tela', () => {
+    voar()
+    fireEvent.click(screen.getByRole('button', { name: missionView.changeMission }))
+    expect(lancar()).toBeEnabled()
+    expect(etiqueta(missionView.chipLaunch)).toHaveTextContent(KENNEDY.name)
+    expect(screen.queryByRole('slider')).not.toBeInTheDocument()
+    expect(screen.queryByRole('group', { name: missionView.flightStatus })).not.toBeInTheDocument()
+    expect(camera()).toBe('earth')
+  })
+
+  it('se a missão muda no meio do voo, a vista volta a planejar, e a câmera sai da nave', () => {
+    const { rerender } = voar()
+    expect(camera()).toBe('craft')
+    useMission.mockReturnValue({ status: 'loading', mission: null })
+    rerender(
+      <MissionView
+        dateUtc={DATA} launchSites={launchSites} launchSiteId={ALCANTARA.id} onLaunchSiteChange={() => {}}
+        landingSite={IM2} skyStatus="ready" landingWindows={JANELAS} landingWindowStartMs={null} onLandingWindowChange={() => {}}
+        sites={sites} onLandingSiteChange={() => {}}
+      />,
+    )
+    expect(lancar()).toBeDisabled()
+    expect(screen.queryByRole('slider')).not.toBeInTheDocument()
+    expect(camera()).toBe('earth')
+  })
+})
+
+describe('MissionView: os detalhes, recolhidos', () => {
+  it('a base escolhida mostra a coordenada dela e um lançamento à Lua que saiu dali', () => {
+    const { unmount } = renderView({ launchSiteId: KENNEDY.id })
+    // as 4 casas da fonte, com o hemisfério por extenso no lugar do sinal
+    expect(valor(missionView.coordinates)).toBe('28.6083° N, 80.6041° W')
+    // em UTC: o IM-2 saiu no dia 26 pelo relógio da Flórida, e no dia 27 em UTC
+    expect(valor(missionView.lunarLaunch)).toBe('IM-2, 27 Feb 2025')
+    unmount()
+    // a base que nunca lançou à Lua diz isso, em vez de ficar sem a linha
+    renderView({ launchSiteId: ALCANTARA.id })
+    expect(valor(missionView.coordinates)).toBe('2.3177° S, 44.3680° W')
+    expect(valor(missionView.lunarLaunch)).toBe(missionView.noLunarLaunch)
+  })
+
+  it('sem missão, não há número de missão; com ela, os números são os que a ponte entregou, na ordem do voo', () => {
+    const { unmount } = comTudo()
+    expect(within(detalhes()).queryByText(missionView.launch, { selector: 'dt' })).not.toBeInTheDocument()
+    unmount()
+    useMission.mockReturnValue({ status: 'ready', mission: missaoDaPonte() })
+    comTudo()
+    expect(valor(missionView.launch)).toBe('30 Nov 2026, 22:00 UTC, heading 88° from north')
+    expect(valor(missionView.parkingOrbit)).toBe("185 km up, tilted 28.5° to the Earth's equator")
+    expect(valor(missionView.tli)).toBe('30 Nov 2026, 23:00 UTC, a burn of 3.14 km/s')
+    expect(valor(missionView.crossing)).toBe('4 d')
+    expect(valor(missionView.loi)).toBe('4 Dec 2026, 23:00 UTC, a burn of 0.84 km/s')
+    expect(valor(missionView.lunarOrbit)).toBe("100 km up, tilted 84.9° to the Moon's equator, for 12 h")
+    expect(valor(missionView.descent)).toBe('5 Dec 2026, 11:00 UTC, a burn of 19 m/s')
+    expect(valor(missionView.landing)).toBe('5 Dec 2026, 12:09 UTC')
+    // as alturas das duas órbitas são as do modelo, e não números soltos na tela
+    expect(MISSION.parkingAltitudeKm).toBe(185)
+    expect(MISSION.lunarOrbitAltitudeKm).toBe(100)
+  })
+
+  it('dizem o que é conta, o que é desenho, o que ficou de fora e quais são as escolhas do modelo', () => {
+    useMission.mockReturnValue({ status: 'ready', mission: missaoDaPonte() })
+    comTudo()
+    expect(within(detalhes()).getByText(missionView.pathNote)).toBeInTheDocument()
+    expect(within(detalhes()).getByText(missionView.leftOutNote)).toBeInTheDocument()
+    expect(within(detalhes()).getByText(missionView.choicesNote(MISSION))).toBeInTheDocument()
+    expect(missionView.choicesNote(MISSION)).toMatch(/185 km up.*about 4 days.*100 km up for about 12 hours.*12 hours after/)
   })
 })

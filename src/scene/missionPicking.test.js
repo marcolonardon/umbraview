@@ -3,7 +3,9 @@
  * three lança na cena; aqui fica a regra, com os números que esse raio entrega. */
 import { describe, expect, it } from 'vitest'
 
-import { readSiteClick } from './missionPicking.js'
+import { systemStateAt } from '../engine/system.js'
+import { landingMarkerPosition, readLandingClick, readSiteClick } from './missionPicking.js'
+import { MOON_RADIUS, kmToUnits } from './missionScale.js'
 import { CLICK_MAX_DRAG_PX } from './picking.js'
 
 /* Quatro marcas numa Terra de raio 1: três do lado de cá (duas quase no mesmo lugar, como as duas
@@ -68,5 +70,49 @@ describe('o clique numa marca de base (readSiteClick)', () => {
     expect(clique([0, 0, 1, undefined], 0)).toBe(1)
     expect(clique([0, 0], 0)).toBe(NADA)
     expect(clique([undefined])).toBe(NADA)
+  })
+})
+
+/* O clique na Lua da vista da missão escolhe o local de pouso (card C17). O raio do clique dá um
+   ponto do desenho; a conta desfaz a posição e o giro da Lua naquele instante para chegar à
+   latitude e à longitude. O caminho de ida é o landingMarkerPosition, que põe a marca do local. */
+describe('o clique na Lua escolhe o local de pouso (readLandingClick)', () => {
+  const estado = systemStateAt(Date.UTC(2026, 11, 5, 12))
+  const lua = kmToUnits(estado.moonKm)
+  const noDesenho = (site) => landingMarkerPosition(site, estado.moonMatrix).map((value, k) => value + lua[k])
+
+  it('devolve a latitude e a longitude do ponto clicado, a menos de 0,0001°', () => {
+    for (const site of [{ lat: -84.7906, lon: 29.1957 }, { lat: 12.5, lon: -140.25 }, { lat: 60, lon: 179.5 }, { lat: -89.9, lon: -45 }]) {
+      const lido = readLandingClick({ point: noDesenho(site), delta: 0 }, lua, estado.moonMatrix)
+      expect(lido.lat).toBeCloseTo(site.lat, 3)
+      expect(lido.lon).toBeCloseTo(site.lon, 3)
+    }
+  })
+
+  it('a marca do local fica no chão da Lua, um fio acima da esfera', () => {
+    const marca = landingMarkerPosition({ lat: -84.7906, lon: 29.1957 }, estado.moonMatrix)
+    expect(Math.hypot(...marca)).toBeGreaterThan(MOON_RADIUS)
+    expect(Math.hypot(...marca)).toBeLessThan(MOON_RADIUS * 1.02)
+  })
+
+  it('a marca do polo norte fica na ponta do eixo da Lua desenhada', () => {
+    // a coluna 1 da matriz do system.js é o polo norte do corpo
+    const m = estado.moonMatrix
+    const marca = landingMarkerPosition({ lat: 90, lon: 0 }, m)
+    const tamanho = Math.hypot(...marca)
+    expect(marca[0] / tamanho).toBeCloseTo(m[4], 9)
+    expect(marca[1] / tamanho).toBeCloseTo(m[5], 9)
+    expect(marca[2] / tamanho).toBeCloseTo(m[6], 9)
+  })
+
+  it('o fim de um arrasto não é clique: girar a Lua não troca o local', () => {
+    const ponto = noDesenho({ lat: -84.7906, lon: 29.1957 })
+    expect(readLandingClick({ point: ponto, delta: 5 }, lua, estado.moonMatrix)).toBeNull()
+    expect(readLandingClick({ point: ponto, delta: 4 }, lua, estado.moonMatrix)).not.toBeNull()
+  })
+
+  it('arredonda para 4 casas: o mesmo clique não vira um pedido novo por um arredondamento', () => {
+    const lido = readLandingClick({ point: noDesenho({ lat: -84.79061234, lon: 29.19574321 }), delta: 0 }, lua, estado.moonMatrix)
+    expect(lido).toEqual({ lat: -84.7906, lon: 29.1957 })
   })
 })

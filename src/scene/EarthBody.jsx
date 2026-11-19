@@ -28,7 +28,8 @@ const AXIS_REACH = 1.6
 /* radius: o raio da Terra na cena. matrix: a orientação dela no instante, um Matrix4 (o
    earthMatrix do src/engine/system.js). sunDirection: a direção do Sol a partir da Terra,
    [x, y, z]. Fica no centro do grupo em que for posta. */
-export function EarthBody({ radius, matrix, sunDirection }) {
+/* showAxis: se a linha do eixo é desenhada; a vista da missão a esconde durante o voo (card C17). */
+export function EarthBody({ radius, matrix, sunDirection, showAxis = true }) {
   const texture = useBodyTexture(earthImageOfPage)
   return (
     <>
@@ -54,7 +55,9 @@ export function EarthBody({ radius, matrix, sunDirection }) {
             <meshBasicMaterial color={token('--color-bg')} wireframe transparent opacity={0.35} />
           </mesh>
         )}
-        <Line points={[[0, -radius * AXIS_REACH, 0], [0, radius * AXIS_REACH, 0]]} color={token('--color-text-muted')} lineWidth={1} />
+        {showAxis && (
+          <Line points={[[0, -radius * AXIS_REACH, 0], [0, radius * AXIS_REACH, 0]]} color={token('--color-text-muted')} lineWidth={1} />
+        )}
       </group>
       {/* fora do grupo que gira com a Terra: o véu é do lado do dia, e não dos continentes */}
       <EarthHaze radius={radius} sunDirection={sunDirection} color={token('--color-earth')} />

@@ -54,6 +54,11 @@
   align-items: start;
 }
 
+/* Na vista da missão não há painel ao lado: a cena fica com a largura toda. */
+.app__main--focus {
+  grid-template-columns: minmax(0, 1fr);
+}
+
 .app__stage {
   display: flex;
   flex-direction: column;

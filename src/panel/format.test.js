@@ -3,7 +3,7 @@
  * e não no fuso do computador de quem usa. */
 import { describe, expect, it } from 'vitest'
 
-import { formatDegrees, formatDuration, formatPercent, formatUtc, formatUtcDate } from './format.js'
+import { formatDegrees, formatDuration, formatElapsed, formatPercent, formatUtc, formatUtcDate } from './format.js'
 
 describe('formatDegrees', () => {
   it('mostra uma casa decimal e o símbolo de grau', () => {
@@ -56,5 +56,23 @@ describe('formatDuration', () => {
     expect(formatDuration(0.33)).toBe('20 min')
     // 59,7 min arredondam para 60: aí já é 1 h, e não "60 min"
     expect(formatDuration(0.995)).toBe('1 h')
+  })
+})
+
+/* O tempo de missão do painel de voo (card C17): quanto passou desde o lançamento. Os minutos e as
+   horas levam dois dígitos, para o número não mudar de largura enquanto a missão toca. */
+describe('formatElapsed', () => {
+  it('na primeira hora mostra os minutos; depois, horas e minutos; a partir de um dia, dias e horas', () => {
+    expect(formatElapsed(0)).toBe('00 min')
+    expect(formatElapsed(0.125)).toBe('07 min')
+    expect(formatElapsed(1)).toBe('1 h 00 min')
+    expect(formatElapsed(23.5)).toBe('23 h 30 min')
+    expect(formatElapsed(28)).toBe('1 d 04 h')
+    expect(formatElapsed(110.15)).toBe('4 d 14 h')
+  })
+
+  it('corta para baixo: o relógio de uma missão não adianta', () => {
+    expect(formatElapsed(0.999)).toBe('59 min')
+    expect(formatElapsed(47.99)).toBe('1 d 23 h')
   })
 })

@@ -2218,6 +2218,400 @@ tells about the view; and `verify` passes.
   request for less motion; a touch screen; a browser other than Chromium; the production build
   opened in a browser; and the time on Miguel's laptop.
 
+### C17 · Mission control: build the mission one step at a time, and fly it
+
+**Status:** in progress on the branch `feat/c17-mission-control` of Marco's fork
+(`marcolonardon/umbraview`), born from the branch of card C16. The five phases built on 18/11; they
+wait for Marco's check in the browser, and phase 5 for a test with someone who has never seen the
+screen. The card waits for Enzo's OK and for the PR
+number ·
+**Depends on:** C16
+
+**What it is for.** In card C16 the landing site could only be chosen outside the Mission view,
+and the lists of the mission sat loose under the scene, followed by a wall of numbers and notes.
+Marco, after using it on 18/11, found it confusing to choose his own landing site to start a
+mission, and asked for the view to be reorganized so that it works more like a game.
+
+**The first version, and why it was thrown away.** A panel "Mission control" beside the scene,
+with the three steps open at once, a Launch button, a timeline and a summary. Marco did not like
+it: too much on screen, and a poor view of the mission. Measured on 18/11/2026, at 1440 × 900,
+with a mission ready:
+- the scene had 596 × 396 px, 18% of the screen; the panel beside it was taller than the scene,
+  and the site panel took 400 px more;
+- 631 words and 29 controls in view, and the page scrolled for 1,530 px;
+- the landing site was in two lists side by side, and the landing windows in a list and again in
+  cards of the site panel;
+- five names on top of each other around the Earth, all in capitals;
+- in the middle of the crossing, with the camera on the spacecraft, only a line and a dot on
+  black: no Earth, no Moon.
+
+**The principles of the redesign**, agreed with Marco on 18/11:
+1. The scene is the main thing: at least 60% of the screen in the Mission view.
+2. One decision at a time: only the current step is open.
+3. The choice is made in the scene itself, and the camera goes by itself to where one chooses.
+4. One control for time, in place of the phases plus the cursor.
+5. One name at a time in the scene.
+6. No made-up data: every number still comes from the engine.
+
+**The plan, in five phases.** Each one is checked in the browser before the next.
+1. **Clean up and focus** (built, below).
+2. **Choose in the scene** (built, below): the known landing sites as pins on the Moon, the
+   landing windows as cards in place of a list, the launch pads as bigger marks with their names.
+   The lists stay as the keyboard way.
+3. **Flight panel** (built, below): one track from the Earth to the Moon in place of the six
+   phases and the cursor; one button to play and pause, and a speed; a card with the phase, the
+   mission time, the height and the speed, computed from the points of the path; the part of the
+   line already flown stronger than the rest; the marks of the other launch sites and the axis
+   lines hidden during the flight.
+4. **A camera that tells the story** (built, below): it frames each phase by itself; a small map
+   in a corner shows the whole path to scale, with the spacecraft; the four camera buttons become
+   one, "free camera"; with the request for less motion, the camera cuts instead of gliding.
+5. **The end of the mission and the finish** (built, below, except the test with a person): the
+   summary over the scene; narrow screens, keyboard, contrast and screen reader; and a test with
+   someone who has never seen the screen (launching a mission in under 30 seconds, without
+   reading instructions).
+
+**Phase 1, as it turned out.**
+- **The Mission view takes the screen.** In it, the site panel and "Sky over the site" leave the
+  page (`App.jsx`), and the scene has the whole width and 64% of the height of the window.
+  Consequence: the date cannot be changed from inside the Mission view; the landing windows are
+  the ones of the 30 days after the date chosen in the other views.
+- **Mission control is drawn over the scene** (`src/scene/MissionControl.jsx`): three labels in
+  the top corner, one per step, and one card in the bottom corner with only the open step. A step
+  that is done shows what was chosen in its label ("Athena (IM-2)", "19 Nov 2026 · ≥ 11 d 19 h",
+  "Kennedy Space Center, LC-39A"), and a click on the label opens the step again. With the three
+  done, the card is the launch: "Ready to launch." and the Launch button.
+- **The camera goes where one chooses:** to the Moon in the landing step, to the Earth in the
+  launch site step. The view opens on the Moon, with the question "Where to land?". The links
+  "Show the Moon" and "Show the Earth" are gone.
+- **Two modes, plan and fly.** Planning, there is no clock and no timeline, and the line of the
+  mission is a preview, without the spacecraft and the names of the events. Launch takes the panel
+  away and brings the timeline and the clock; "Change mission" goes back to the panel, with the
+  mission still built. If any choice changes, the view goes back to planning.
+- **What left the screen:** the count "2 of 3 ready", the coordinates of the landing site (now in
+  the details), the hints with links, the sentence "Reference mission from ... to ...", the line
+  that said to complete the three steps, and the period clock of card C13, which showed the Earth
+  turning with no mission.
+- **The note that it is a reference mission** became a small label over the scene, "Reference
+  mission", which opens the text on a click. It is there whenever a mission is on screen.
+- **Kept from the first version:** choosing the landing site with a click anywhere on the Moon
+  (`readLandingClick`, in `src/scene/missionPicking.js`), with a mark on the point; the clock that
+  stops at the landing (`stopAtHour`, in `useViewClock`); the timeline of six phases and the
+  summary at the landing (`src/scene/MissionTimeline.jsx`), which phase 3 replaces; the camera
+  above the pad at every launch; and the numbers and notes folded under "Mission details and what
+  is real".
+
+**Measured after phase 1**, on 18/11/2026, at 1440 × 900, in the app's browser pane (Chromium):
+
+| | Before | Planning | Flying |
+|---|---|---|---|
+| Scene, share of the screen | 18% | 62% | 62% |
+| Scene, in pixels | 596 × 396 | 1392 × 576 | 1392 × 576 |
+| Controls of the view in sight | 26 | 8 or 9 | 15 |
+| Words in sight | 631 | 36 to 61 | 47 |
+| Height of the page | 1,530 px | 900 px, no scroll | 900 px, no scroll |
+
+The app's own view selector (3 buttons) is not in the count. The target of 8 controls per step is
+met in the first step and missed by one when a mission is ready (the label "Reference mission");
+the 15 of the flight are what phase 3 is for.
+
+**Verified** on 18/11/2026, with `npm run dev` in the app's browser pane (Chromium), at 1440 × 900:
+- The view opens on the Moon, with the three labels, the first one current, and the card "Where
+  to land?".
+- A click on the Moon chose a point: the label became "Your point on the Moon", the mark "Landing
+  site" stayed on it, and the card went to "When to land?" saying that the point has no landing
+  window in the next 30 days (it is on the far side).
+- Opening the first label again and choosing Athena (IM-2) in the list: the second label got the
+  first window, the camera went to the Earth and the card asked "Where to launch from?".
+- Choosing Kennedy LC-39A: the three labels done, the line of the mission as a preview, the label
+  "Reference mission" and the card "Ready to launch." with the Launch button.
+- Launch: the labels and the card left, "Change mission" appeared, the timeline and the clock came,
+  and the camera followed the spacecraft. "Change mission" brought the panel back.
+- The console: see phase 2, below. The check made in this phase could not see the page's errors.
+- Still as before, for phases 3 and 4: in the middle of the crossing the camera of the spacecraft
+  shows a line and a dot on black; three names pile up near the pad during the flight.
+- Test first, for what was new in the code before the redesign: the click on the Moon and the
+  clock that stops failed before the code. For the redesign itself the tests of the view were
+  rewritten after the layout was decided, 35 in place of 40; 7 of them failed on the first run, on
+  two real faults (the hint was inside the label of each list, so the list had no clean name; and
+  a helper of the test set the cursor to the value it already had).
+- `npm run verify` passes, with 854 tests in 65 files and no lint warning.
+- Not verified: Marco's own check in the browser; a narrow screen; the request for less motion; a
+  touch screen; and a browser other than Chromium.
+
+**Phase 2, as it turned out.**
+- **The known landing sites are pins on the Moon.** In the landing step, the ten sites of
+  `src/data/sites.js` are dots in the accent color (white, as the marks of the launch pads, was lost
+  on the light grey of the Moon). The name of a site shows when the mouse is over its pin, and a
+  click chooses it. A click anywhere else on the Moon still chooses that point. The pins on the
+  far side of the Moon do not answer: the Moon takes the click first.
+- **The camera of the landing step looks at the south pole, from close.** The ten sites are
+  within 6.4° of the pole, and from the usual view of the Moon they pile up at the bottom edge. The
+  camera now aims at the point of the pole on the ground, from 0.15 Earth radius, 20° off the
+  Moon's axis towards the Sun (`landingViewDirection`, in `src/scene/missionPath.js`): the ten pins
+  fit in the height of the scene, and the two closest ones are about 13 pixels apart. Around the
+  pole the camera does not rise above its horizon, or it would go inside the Moon
+  (`minPolarAngle`, in `ZoomControls.jsx`).
+- **A defect found on the way:** the first try aimed at the center of the Moon from 20° off the
+  axis, and the pole, with every pin, was outside the screen.
+- **The landing windows are cards**, one per window, with the duration in large type and the two
+  dates under it. In the list, the text of each window was cut. Each card is a real radio button,
+  so the arrow keys change the window.
+- **The launch pads have names.** In the launch site step the marks are 1.8 times bigger, and the
+  name of a pad shows when the mouse is over its mark. During the flight only the chosen pad is
+  drawn, and the scene chooses nothing: a click on the Moon or on a mark does not change the
+  mission in flight.
+- **The camera of the launch site step looks at the day side of the Earth, 25° north of the
+  equator** (`launchViewDirection`), near the middle latitude of the pads (28.6° N). Another defect
+  found in the browser: coming from the south pole of the Moon, the camera arrived looking at the
+  Earth from below, with Antarctica in the middle and no pad in sight.
+- **The lists are folded** behind "Choose from a list" (`<details>`), in the landing step and in
+  the launch site step. They are how the keyboard chooses, because the scene does not take focus.
+- **The date** still cannot be changed from inside the Mission view. Marco did not ask for it.
+
+**Verified for phase 2** on 18/11/2026, with `npm run dev` in the app's browser pane (Chromium), at
+1440 × 900, with the pane in view (hidden, the page does not draw the 3D scene at all):
+- The view opens on the south pole of the Moon, with the ten pins.
+- The mouse over a pin showed "Slater Plain (center)"; the click chose it, the first window came
+  ("21 Nov 2026 · 2 d") and the camera went to the Earth, on the day side, north up, with the pads
+  in sight.
+- The mouse over a mark showed "Vostochny, Site 1S"; the click chose it, and the card became
+  "Ready to launch.".
+- Opening the label of the window showed two cards, "2 d 14 h" and "2 d 8 h", each with its
+  dates, the first one chosen; choosing the second gave a new mission.
+- Launch: only the chosen pad stayed on the Earth, and the flight went as in phase 1.
+- The console, read from the browser's own list on a fresh load, going from the Moon view to
+  Mission and back: no error, only the usual `THREE.Clock` warning. The React error "Attempted to
+  synchronously unmount a root" appears only when a file is hot-reloaded during development.
+- Test first: the 3 tests of the camera of the landing step, the 3 of the camera of the launch
+  site step, and the 4 of the cards and of the folded lists failed before the code.
+- `npm run verify` passes, with 862 tests in 65 files and no lint warning.
+- Not verified: the pins and the names with a touch screen, where there is no mouse over; the
+  arrow keys on the window cards, in a real browser; and what was not verified in phase 1.
+
+**Phase 3, as it turned out.**
+- **One track for time** (`MissionTrack`, in `src/scene/MissionFlight.jsx`), from the Earth to the
+  Moon, in place of the timeline of six buttons plus the cursor of the clock. It is an ordinary
+  range control: the arrow keys move it, and the screen reader hears "Crossing, T+ 1 h 00 min",
+  not a number. Under it, the names of the six phases are a legend, not buttons, with the current
+  one marked.
+- **The track is not a ruler of time.** The crossing takes 87% of the time of the mission and the
+  climb 0.2%; on a ruler of time the launch and the landing, which are what one most wants to
+  see, would vanish at the two ends. Each phase has a piece of the track by its weight (1 for the
+  climb, the parking orbit, the descent and the landing, 3 for the crossing, 2 for the lunar
+  orbit), and inside the piece time runs evenly (`trackLayout`, `timeAtTrack` and `trackAtTime`,
+  in `src/scene/missionPath.js`).
+- **Playing follows the track, not the time.** The whole mission takes 45 seconds, or 11 at the
+  fast speed ("4× speed"): 5 seconds for the climb and for the landing, 15 for the crossing.
+  Following time, at 2 hours per second, the climb went by in a tenth of a second.
+- **One button plays and pauses.** The clock stops at the landing, as before.
+- **The flight card** (`MissionTelemetry`), over the scene: the phase, the mission time ("T+ 1 d
+  04 h") and the spacecraft in numbers, the height above the body it is counted from and the
+  speed relative to it. The numbers come from the points of the path the engine computed
+  (`telemetryAt`): the speed is the distance between the two points around the instant, divided
+  by the time. In the two drawn stretches the card says "Drawn, not computed" and shows no number.
+- **The line says where the mission is.** The part already flown is drawn strong and the rest
+  faint. It is the same line drawn twice, the strong one with fewer pieces
+  (`geometry.instanceCount`), so the geometry is not rebuilt at every frame.
+- **One name at a time.** During the flight the scene names only the next event, the place the
+  spacecraft is going to (`nextEvent`). The name of the launch site and the name "Spacecraft"
+  left; the spacecraft is a bigger dot. The axis lines of the Earth and of the Moon are hidden
+  during the flight, and the one of the Moon also in the landing step, where it crossed the pins.
+- **The camera of the spacecraft stays on the outer side of the body.** A defect found in the
+  browser: with the camera still in relation to the spacecraft, the spacecraft went around the
+  Earth in the parking orbit and vanished behind it, with the screen full of sea. The camera now
+  stays above the spacecraft, with the Earth or the Moon behind it, and follows it at every step
+  of the track. In the crossing it is placed once and then left free. This is a first part of
+  phase 4.
+- **The summary of the landing is over the scene**, in the corner where the launch card was:
+  under the scene it pushed the page past the screen. Its total time is written the same way as
+  the mission time of the flight card; before, one was rounded and the other cut, and they
+  differed by an hour.
+- **Gone:** `MissionTimeline.jsx`, the timeline of six buttons, replaced by the track before it
+  was ever committed. `ViewClock.jsx` is no longer used by the Mission view; the `stepHours` that
+  card C16 gave it is now unused.
+
+**Measured after phase 3**, at 1440 × 900: during the flight, 10 controls of the view in sight (15
+after phase 1), 11 with the summary on screen; no scroll, with or without the summary.
+
+**Verified for phase 3** on 18/11/2026, with `npm run dev` in the app's browser pane (Chromium), at
+1440 × 900, with the pane in view:
+- After Launch: the flight card with "Climb", "T+ 05 min" and "Drawn, not computed"; the track
+  with the legend of the six phases, each as wide as its piece; the line faint ahead of the
+  spacecraft.
+- In the parking orbit: "185 km above the Earth · 7.79 km/s", the spacecraft over the Earth with
+  the Earth behind it.
+- In the middle of the crossing: the Earth small behind the spacecraft, the flown part of the line
+  strong and the rest faint, and the card with more than 270 thousand km and 0.83 km/s.
+- In the lunar orbit: "100 km above the Moon · 1.63 km/s", the ring of the orbit around the Moon,
+  and the name "Landing" at the place the spacecraft is going to.
+- Played at the fast speed from the launch, the mission reached the landing in 11.2 seconds and
+  stopped by itself; the summary appeared over the scene with "4 d 18 h" and "4.01 km/s", the same
+  "T+ 4 d 18 h" as the flight card.
+- The console, read from the browser's own list on a fresh load, through the whole flight: no
+  error, only the usual `THREE.Clock` warning.
+- Test first: the tests of `formatElapsed`, of the track, of the flown points, of the telemetry
+  and of the next event failed before the code, and 9 of the tests of the view failed before the
+  flight panel existed. One test caught a real fault: at the first instant of a stretch the speed
+  came out zero.
+- `npm run verify` passes, with 882 tests in 65 files and no lint warning.
+- Not verified: the track with the keyboard and with a screen reader, in a real browser; a narrow
+  screen, where the legend of the phases is cut; the request for less motion, with the camera now
+  following the spacecraft; and what was not verified in phases 1 and 2.
+
+**Phase 4, as it turned out.**
+- **The camera goes by itself, in the planning and in the flight.** The four camera buttons
+  (Earth, Moon, Whole orbit, Spacecraft) are gone. In the planning the camera follows the open
+  step, as since phase 2: the south pole of the Moon to choose where to land, the Earth to choose
+  the pad. In the flight it follows the spacecraft and places itself in one way per phase
+  (`craftViewDirection`, in `src/scene/missionPath.js`):
+  - in the climb, in the parking orbit and in the first half of the crossing, on the outer side
+    of the Earth: the Earth is behind the spacecraft, getting smaller;
+  - from the middle of the crossing on, in the lunar orbit, in the descent and at the landing, on
+    the outer side of the Moon: the Moon is ahead, getting bigger.
+  Before, in the crossing, the camera was placed once and left alone, and what was on screen was
+  a line on black.
+- **One button, "Free camera"**, on the track, beside the speed. Off, the camera places itself at
+  every step of the track: a view turned with the mouse is put back at the next step. On, the
+  camera still goes along with the spacecraft, but who turns it and zooms is the person. Each
+  launch turns it off again.
+- **A small map of the whole path** (`MissionMap.jsx`, with the numbers from `missionMap.js`), in
+  the top right corner of the scene, under the view selector, only during the flight. It is the
+  view from above the plane of the Earth's orbit: the Earth, the orbit of the Moon, the Moon at
+  the instant of the clock, the crossing and the spacecraft, with the flown part of the line
+  stronger. The distances are to scale and the Earth is drawn at its real size; the Moon and the
+  spacecraft, which at that scale would be under 1 pixel, are dots of a fixed size, and the
+  caption says so. Only the crossing is in the line: the parking orbit and the lunar orbit are
+  under 1% of the size of the map. The line of the crossing comes with about 3 thousand points
+  and is drawn with 120 pieces at most.
+- **The map is an SVG whose frame is in km**: the browser does the scaling, and the map has a
+  name for the screen reader. It does not take clicks (`pointer-events: none`): the scene under
+  it still turns.
+- **The scene says where the camera is turned** (`data-camera`: `pole`, `earth` or `craft`). The
+  camera belongs to WebGL, which the tests do not have; the attribute is what the tests of the
+  view read, in place of the pressed state of the buttons that left.
+- **Less motion.** With the request for less motion the camera cuts instead of gliding. This was
+  already in `ZoomControls.jsx` since card C13 (every move of the camera is asked without
+  transition), and phase 4 added no move outside it; it has no test of its own, and it was not
+  seen in a browser (below).
+- **Gone:** the texts `cameraLabel` and `camera` of `src/data/missionView.js`, the "Whole orbit"
+  camera and the CSS of the camera buttons.
+
+**Measured after phase 4**, at 1440 × 900: in the planning, 6 controls of the view in sight (8 to
+9 after phase 2); in the flight, 7 (10 after phase 3); no scroll. The map takes 200 × 138 px.
+
+**Verified for phase 4** on 18/11/2026, with `npm run dev` in the app's browser pane (Chromium), at
+1440 × 900, with the pane in view, in a mission from Kennedy LC-39A to Athena (IM-2):
+- The camera by step, read from `data-camera`: `pole` in the landing step, `earth` in the launch
+  step, `craft` after Launch.
+- In the climb ("T+ 03 min"): the Earth whole, with Florida in front and the spacecraft over it.
+- In the first half of the crossing ("T+ 21 h 15 min", 174,508 km above the Earth, 1.56 km/s):
+  the Earth small behind the spacecraft, the flown line strong.
+- In the second half ("T+ 3 d 09 h", 357,109 km, 0.47 km/s): the camera behind the spacecraft,
+  with the Moon ahead and its name on it.
+- In the lunar orbit ("100 km above the Moon · 1.63 km/s") and at the landing: the Moon in the
+  middle of the scene, with the ring of the orbit and the name "Landing".
+- The map: the dot of the spacecraft near the Earth at the start, near the Moon at the end, and
+  the flown part of the line stronger. It sits 1 px under the view selector and does not touch
+  the summary of the landing (measured from the boxes of the three).
+- "Free camera" off, in the parking orbit: a view turned with the mouse was put back two steps
+  of the track later. On: the turned view was still the same two steps later, with the mission
+  time going from "T+ 43 min" to "T+ 44 min".
+- The console, read from the browser's own list on a fresh load, through the whole flight: no
+  error, only the usual `THREE.Clock` warning.
+- Test first: the tests of `craftViewDirection` failed with "craftViewDirection is not a
+  function", the ones of `missionMap` had no file to import, and 8 of the 43 tests of the view
+  failed before the code. The test that keeps screen text out of the components took one line
+  of the map for text (a `>` and a `<` on the same line); the count of the flown part of the line
+  moved to `missionMap.js` (`flownOnMap`), with its own tests, after the check in the browser.
+- `npm run verify` passes, with 897 tests in 66 files and no lint warning.
+- Not verified: the request for less motion, which could not be turned on in the pane; the
+  change of side of the camera in the middle of the crossing while the mission plays (it was
+  seen with the cursor taken to before and after it); a touch screen; a narrow screen, where the
+  map and the flight card may meet; the map with a screen reader; and what was not verified in
+  phases 1 to 3.
+- Known and left for phase 5: at the end the names "Landing" and "Moon" are on top of each
+  other, and with the free camera turned to the side of the Earth, in the parking orbit, the
+  ground fills the screen.
+
+**Phase 5, as it turned out.** It started by measuring the view on a phone (375 × 812) and with
+the keyboard, and most of it is repair of what the measuring found.
+- **The camera asks for a frame.** A defect older than this phase, found here: when the order to
+  the camera came from outside a click (the landing windows arriving, the mission just computed),
+  the camera moved but nothing was drawn, and the screen stayed on the view before until someone
+  touched it. Choosing a pin with the window already chosen left the whole Moon on screen under
+  "Where to launch from?"; choosing a pad from the list left the Earth turned to the wrong side.
+  The scene draws only on request, and the Drei camera asks for the next frame only from inside a
+  frame; `ZoomControls.jsx` now asks for the first one itself. It has a test of its own for the
+  first time (`ZoomControls.test.jsx`), which also covers the request for less motion.
+- **Narrow screens.**
+  - The track: on one line the three buttons did not shrink and the track had a width of zero.
+    Up to 900 px wide (where the page goes to one column) the track takes the whole line, between
+    "Earth" and "Moon", and the buttons go to the line below.
+  - The names of the phases under the track are hidden when the track is under 42 rem wide (it
+    measures itself, with a container query): cut with an ellipsis they said nothing. The bar of
+    the six pieces stays, thicker, with the current one in the accent color, and the names stay
+    for the screen reader.
+  - On a phone (up to 600 px) the map shrinks and loses its caption, and the flight card stops
+    before it; the map covered the card.
+  - On a phone the "Reference mission" badge and the summary of the landing go under the scene:
+    the badge covered the Launch button, and the summary covered the place of the landing. The
+    scene and what is anchored to it are now in an area of their own (`mission-view__scene-area`).
+  - The list of the step labels no longer takes the mouse, only the labels: wrapped in two lines,
+    the empty part of the list swallowed the click on the pin behind it.
+- **Keyboard.** The focus is not lost when the control that had it leaves the page
+  (`useKeepFocus`, in `src/hooks/`): after choosing from a list it goes to the question of the next
+  step (or, in the launch step, to its notice); after Launch and after "Launch again", to the
+  play and pause button; after "Change mission", back to the card. Only when it was lost: focus
+  on another control stays where it is. Before, the next Tab started from the top of the page.
+- **Screen reader.** During the flight a notice out of view says the phase when it changes, and
+  "Mission complete" at the landing: six or seven announcements in a mission. The flight card is
+  not a notice, because its numbers change at every frame.
+- **Contrast.**
+  - The names in the accent color over the scene (the next event, the chosen pad, a pin under
+    the mouse) have the page background behind them: amber alone over the lit Moon is about 1.3
+    to 1.
+  - The pins, the landing mark and the spacecraft have a dark rim (`rimmed`, in `ScreenDot`): amber
+    on the lit ground of the Moon and white over the clouds of the Earth nearly vanished.
+  - The pair of the summary title and of the check marks (success over surface) joined
+    `tokens.test.js`.
+- **One name at a time, at the Moon.** With the next event on the Moon and the camera near it, the
+  name "Moon" is hidden: it sat under "Landing", both unreadable. From far, where the name of the
+  event is hidden, "Moon" is back.
+
+**Measured for phase 5.** On a phone (375 × 812), before and after: the track, 0 px and 250 px
+wide; the flight card and the map, overlapping by 50 px and 38 px apart; the badge, over the
+Launch button and under the scene. The shortest way to a mission in flight is 3 actions (a pin, a
+pad, Launch): the first landing window comes chosen.
+
+**Verified for phase 5** on 18/11/2026, with `npm run dev` in the app's browser pane (Chromium),
+with the pane in view:
+- At 375 × 812: the ten pins in sight; the pin beside the labels, which did not answer, chooses
+  the site; the camera arrives at the Earth by itself after it, and turns to Kennedy when the pad
+  is chosen from the list; the Launch card inside the scene with the badge under it; in flight,
+  the track with its bar and the three buttons under it, the flight card beside the small map;
+  at the landing, the summary under the scene and only "Landing" named on the Moon.
+- At 768 × 1024: the track on two lines, the summary over the scene, nothing on top of anything.
+- At 1440 × 900: the same as after phase 4, with the names of the six phases under the track.
+- Keyboard only, at 1440 × 900: Tab to "Choose from a list", Enter, Tab, arrow down chose Athena
+  (IM-2), and the focus went to "Where to launch from?", with the focus ring; from the notice
+  of the launch card, Tab reached Launch, Enter launched, the focus was on Pause, the space bar
+  paused, Tab reached the track and 20 presses of the right arrow moved it 20 steps ("Climb, T+
+  04 min").
+- The console, read from the browser's own list on a fresh load: no error, only the usual
+  `THREE.Clock` warning.
+- Test first: the tests of the frame request, of the focus and of the phase notice failed before
+  the code (8 tests, plus the file of `useKeepFocus`, which had nothing to import).
+- `npm run verify` passes, with 914 tests in 68 files and no lint warning.
+- Not verified: **the test with someone who has never seen the screen**, which needs a person
+  (launch a mission in under 30 seconds, without reading instructions); a real screen reader (the
+  roles, the names and the notices are in the tests, but nothing was listened to); a real phone
+  or a touch screen (the pane imitates the size, and its clicks are mouse clicks); the request
+  for less motion in a browser (it has a test now); and browsers other than Chromium.
+- Known and left: the date cannot be changed from inside the Mission view; on a phone the small
+  title "Lunar scene" is under the view selector, in the three views; `ViewClock.jsx` still has
+  the `stepHours` that card C16 gave it, now unused.
+
 ---
 
 ## I: Miguel

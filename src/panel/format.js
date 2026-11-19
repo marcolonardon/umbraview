@@ -42,3 +42,15 @@ export function formatDuration(hours) {
   const rest = total % 24
   return rest === 0 ? `${days} d` : `${days} d ${rest} h`
 }
+
+/* O tempo de missão do painel de voo (card C17): quanto passou desde o lançamento. Corta para
+   baixo, como um relógio, e os minutos e as horas levam dois dígitos, para o número não mudar de
+   largura enquanto a missão toca. */
+export function formatElapsed(hours) {
+  const two = (value) => String(value).padStart(2, '0')
+  // a folga é para 1 hora que chega como 0,9999999 não virar 59 minutos
+  const minutes = Math.floor(hours * 60 + 1e-6)
+  if (minutes < 60) return `${two(minutes)} min`
+  if (minutes < 24 * 60) return `${Math.floor(minutes / 60)} h ${two(minutes % 60)} min`
+  return `${Math.floor(minutes / (24 * 60))} d ${two(Math.floor(minutes / 60) % 24)} h`
+}

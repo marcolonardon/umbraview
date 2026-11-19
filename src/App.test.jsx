@@ -13,6 +13,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest'
 import App from './App.jsx'
 import { about } from './data/about.js'
 import { app } from './data/app.js'
+import { siteSky } from './data/siteSky.js'
 import { launchSites } from './data/launchSites.js'
 import { missionView } from './data/missionView.js'
 import { panel } from './data/panel.js'
@@ -299,6 +300,35 @@ describe('App, a vista da missão (card C13)', () => {
     expect(vistaDaMissao.props.skyStatus).toBe('idle')
     expect(vistaDaMissao.props.landingWindows).toBeNull()
     expect(vistaDaMissao.props.landingWindowStartMs).toBeNull()
+    // os locais conhecidos, para a lista do painel da missão (card C17)
+    expect(vistaDaMissao.props.sites).toBe(sites)
+  })
+
+  /* Na vista da missão a cena é a protagonista (card C17): o painel do ponto e o céu dele saem da
+     tela, e voltam nas outras vistas. Com eles ao lado, a cena tinha 18% da tela, e o local de
+     pouso aparecia em duas listas. */
+  it('na vista da missão, o painel do ponto e o céu dele saem da tela; nas outras, voltam', () => {
+    render(<App />)
+    const painel = () => screen.queryByRole('region', { name: app.panel.title })
+    const ceu = () => screen.queryByRole('region', { name: siteSky.title })
+    expect(painel()).toBeInTheDocument()
+    expect(ceu()).toBeInTheDocument()
+    fireEvent.click(screen.getByRole('button', { name: missionView.viewMission }))
+    expect(painel()).not.toBeInTheDocument()
+    expect(ceu()).not.toBeInTheDocument()
+    fireEvent.click(screen.getByRole('button', { name: systemView.viewSystem }))
+    expect(painel()).toBeInTheDocument()
+    expect(ceu()).toBeInTheDocument()
+  })
+
+  /* O local de pouso escolhido no painel da missão, pela lista ou pelo clique na Lua, é o mesmo
+     ponto do resto da tela: o painel do ponto e o céu dele passam a falar desse local. */
+  it('o local de pouso escolhido na vista da missão vira o ponto da tela inteira', () => {
+    render(<App />)
+    fireEvent.click(screen.getByRole('button', { name: missionView.viewMission }))
+    act(() => vistaDaMissao.props.onLandingSiteChange(TOP_1))
+    expect(vistaDaMissao.props.landingSite).toEqual(TOP_1)
+    expect(vistaDaMissao.props.skyStatus).not.toBe('idle')
   })
 
   /* O local de pouso da missão é o ponto escolhido na Lua, o mesmo do painel, e as janelas são as

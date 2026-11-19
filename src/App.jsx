@@ -66,7 +66,9 @@ export default function App() {
         <p className="app__tagline">{app.tagline}</p>
       </header>
 
-      <main className="app__main">
+      {/* Na vista da missão a cena toma a largura toda: o céu do ponto e o painel dele saem da
+          tela, e o local de pouso é escolhido no painel da própria vista (card C17). */}
+      <main className={view === 'mission' ? 'app__main app__main--focus' : 'app__main'}>
         <div className="app__stage">
           <section className="app__scene" aria-labelledby="scene-title">
             <h2 id="scene-title" className="app__region-title app__region-title--over">{app.scene.title}</h2>
@@ -104,24 +106,30 @@ export default function App() {
                 landingWindows={sky?.landingWindows ?? null}
                 landingWindowStartMs={landingWindowStartMs}
                 onLandingWindowChange={setLandingWindowStartMs}
+                sites={sites}
+                onLandingSiteChange={setSite}
               />
             )}
           </section>
 
-          <section className="app__sky" aria-labelledby="sky-title">
-            <h2 id="sky-title" className="app__region-title">{siteSky.title}</h2>
-            <SiteSky status={status} sky={sky} onDateChange={setDateUtc} />
-          </section>
+          {view !== 'mission' && (
+            <section className="app__sky" aria-labelledby="sky-title">
+              <h2 id="sky-title" className="app__region-title">{siteSky.title}</h2>
+              <SiteSky status={status} sky={sky} onDateChange={setDateUtc} />
+            </section>
+          )}
         </div>
 
-        <section className="app__panel" aria-labelledby="panel-title">
-          <h2 id="panel-title" className="app__region-title">{app.panel.title}</h2>
-          <SiteList sites={sites} selectedId={site?.id} onSelect={setSite} />
-          <DateTimeControl dateUtc={dateUtc} onChange={setDateUtc} />
-          <SitePanel status={status} sky={sky} />
-          {/* por último: quem já escolheu um ponto quer os números primeiro */}
-          <About />
-        </section>
+        {view !== 'mission' && (
+          <section className="app__panel" aria-labelledby="panel-title">
+            <h2 id="panel-title" className="app__region-title">{app.panel.title}</h2>
+            <SiteList sites={sites} selectedId={site?.id} onSelect={setSite} />
+            <DateTimeControl dateUtc={dateUtc} onChange={setDateUtc} />
+            <SitePanel status={status} sky={sky} />
+            {/* por último: quem já escolheu um ponto quer os números primeiro */}
+            <About />
+          </section>
+        )}
       </main>
 
       <footer className="app__footer">

@@ -57,6 +57,8 @@ describe.each([
   ['color-sun', 'color-surface', TEXTO],
   ['color-earth', 'color-surface', TEXTO],
   ['color-danger', 'color-surface', TEXTO],
+  // o título do resumo do pouso e o visto das etiquetas do painel da missão (card C17)
+  ['color-success', 'color-surface', TEXTO],
   ['color-border-control', 'color-surface', CONTROLE],
   // A Lua é o objeto que a pessoa precisa achar na cena (WCAG 1.4.11, como um controle).
   ['color-moon', 'color-surface', CONTROLE],

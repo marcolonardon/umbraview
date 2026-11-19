@@ -1,0 +1,491 @@
+/* O painel da missão, a linha do tempo e o resumo do pouso (card C17). Só tokens (tokens.css):
+   nada de #hex nem px solto aqui. */
+
+/* O painel fica por cima da cena e não tem fundo: as etiquetas no canto de cima, o cartão no
+   canto de baixo. Só os dois ouvem o mouse; o resto do painel deixa o arrasto passar para a cena. */
+.mission-control {
+  position: absolute;
+  inset: var(--space-8) var(--space-3) var(--space-3);
+  z-index: var(--z-panel);
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: var(--space-3);
+  pointer-events: none;
+}
+
+/* O título existe para o leitor de tela dar nome à região; na tela, as etiquetas já dizem o que é. */
+.mission-control__title {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  margin: 0;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+}
+
+/* A lista das etiquetas não ouve o mouse, só as etiquetas: em tela estreita elas quebram em duas
+   linhas, a lista fica da largura da cena, e o vazio ao lado da etiqueta mais curta engolia o
+   clique no pino que estava atrás dele (visto no navegador, card C17, fase 5). */
+.mission-control__chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+/* Uma etiqueta: o número do passo (ou o visto) e o nome dele, ou o que foi escolhido. */
+.mission-control__chip {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  max-width: calc(var(--panel-width) * 0.6);
+  padding: var(--space-1) var(--space-3) var(--space-1) var(--space-1);
+  border: 1px solid var(--color-border-control);
+  border-radius: var(--radius-lg);
+  background: var(--color-bg);
+  color: var(--color-text-secondary);
+  font: inherit;
+  font-size: var(--font-size-sm);
+  cursor: pointer;
+  pointer-events: auto;
+}
+
+.mission-control__chip[data-done='true'] {
+  color: var(--color-text);
+}
+
+.mission-control__chip[aria-current='step'] {
+  border-color: var(--color-accent);
+  color: var(--color-accent);
+}
+
+.mission-control__mark {
+  flex: none;
+  display: grid;
+  place-items: center;
+  width: var(--space-5);
+  height: var(--space-5);
+  border: 1px solid currentcolor;
+  border-radius: 50%;
+  font-size: var(--font-size-xs);
+  font-variant-numeric: tabular-nums;
+}
+
+.mission-control__chip[data-done='true'] .mission-control__mark {
+  border-color: var(--color-success);
+  color: var(--color-success);
+}
+
+.mission-control__chip-name,
+.mission-control__chip-value {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* Com o valor na etiqueta, o nome do passo sai da tela e fica só para o leitor de tela. */
+.mission-control__chip-name--hidden {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  clip-path: inset(50%);
+}
+
+/* O cartão do passo aberto, no canto de baixo da cena. */
+.mission-control__card {
+  align-self: flex-end;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  width: min(100%, calc(var(--panel-width) * 0.8));
+  padding: var(--space-4);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  background: var(--color-surface);
+  pointer-events: auto;
+}
+
+.mission-control__question {
+  margin: 0;
+  font-size: var(--font-size-md);
+  font-weight: var(--font-weight-medium);
+}
+
+/* A lista, recolhida: o jeito de escolher pelo teclado. */
+.mission-control__list-summary {
+  color: var(--color-text-secondary);
+  font-size: var(--font-size-sm);
+  cursor: pointer;
+}
+
+.mission-control__list[open] > .mission-control__list-summary {
+  margin-bottom: var(--space-2);
+}
+
+/* As janelas de pouso: um cartão por janela, um embaixo do outro. */
+.mission-control__windows {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+
+.mission-control__window {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+  padding: var(--space-2) var(--space-3);
+  border: 1px solid var(--color-border-control);
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+}
+
+/* A escolhida, na cor de destaque; a que tem o foco do teclado, com o anel de foco da página. */
+.mission-control__window:has(:checked) {
+  border-color: var(--color-accent);
+  background: var(--color-surface-raised);
+}
+
+.mission-control__window:has(:focus-visible) {
+  box-shadow: var(--focus-ring);
+}
+
+/* O rádio de verdade continua ali para o teclado e o leitor de tela; quem mostra a escolha é o
+   cartão. */
+.mission-control__radio {
+  position: absolute;
+  opacity: 0;
+  pointer-events: none;
+}
+
+.mission-control__window-duration {
+  font-size: var(--font-size-lg);
+  font-weight: var(--font-weight-medium);
+  font-variant-numeric: tabular-nums;
+}
+
+.mission-control__window-dates {
+  color: var(--color-text-secondary);
+  font-size: var(--font-size-xs);
+}
+
+/* O navegador não passa a fonte da página para o <select>. */
+.mission-control__select {
+  width: 100%;
+  font: inherit;
+  font-size: var(--font-size-sm);
+  color: var(--color-text);
+  background-color: var(--color-bg);
+  border: 1px solid var(--color-border-control);
+  border-radius: var(--radius-sm);
+  padding: var(--space-2);
+}
+
+.mission-control__hint {
+  margin: 0;
+  color: var(--color-text-secondary);
+  font-size: var(--font-size-sm);
+}
+
+.mission-control__notice {
+  margin: 0;
+  color: var(--color-text-secondary);
+  font-size: var(--font-size-sm);
+}
+
+/* Sem texto, o aviso não ocupa lugar. */
+.mission-control__notice:empty {
+  display: none;
+}
+
+/* O botão de lançar: o único preenchido da vista, porque é o passo final. */
+.mission-control__launch {
+  padding: var(--space-3);
+  border: 1px solid var(--color-accent);
+  border-radius: var(--radius-sm);
+  background: var(--color-accent);
+  color: var(--color-on-accent);
+  font: inherit;
+  font-size: var(--font-size-md);
+  font-weight: var(--font-weight-medium);
+  cursor: pointer;
+  transition: transform var(--duration-press) var(--ease-out);
+}
+
+.mission-control__launch:active:not(:disabled) {
+  transform: scale(0.98);
+}
+
+.mission-control__launch:disabled {
+  border-color: var(--color-border);
+  background: none;
+  color: var(--color-text-muted);
+  cursor: default;
+}
+
+/* O trilho do painel de voo: o botão de tocar, a Terra, o trilho, a Lua e a velocidade, numa linha. */
+.mission-track {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--space-3);
+}
+
+.mission-track__end {
+  padding-top: var(--space-1);
+  color: var(--color-text-secondary);
+  font-size: var(--font-size-sm);
+}
+
+.mission-track__rail {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+}
+
+/* O trilho mede a si mesmo: é pela largura dele, e não da tela, que a legenda decide se os nomes
+   das fases cabem (mais abaixo). */
+.mission-track__rail {
+  container-type: inline-size;
+}
+
+/* Em tela estreita o trilho fica com a linha inteira, entre a Terra e a Lua, e os três botões
+   descem para a linha de baixo. Numa linha só os botões não encolhiam, e o trilho ficava com
+   largura zero (medido a 375 px, card C17, fase 5). A mesma largura em que a página passa a uma
+   coluna (App.css). */
+@media (max-width: 900px) {
+  .mission-track {
+    flex-wrap: wrap;
+    row-gap: var(--space-1);
+  }
+
+  .mission-track__end,
+  .mission-track__rail {
+    order: -1;
+  }
+
+  /* a quebra de linha entre o trilho e os botões: sem ela, os botões que coubessem subiam para
+     a linha do trilho, e os outros ficavam sozinhos embaixo */
+  .mission-track::before {
+    content: '';
+    flex-basis: 100%;
+  }
+}
+
+/* O cursor do trilho: a parte já voada vem na cor de destaque, que o navegador pinta sozinho. */
+.mission-track__range {
+  width: 100%;
+  margin: 0;
+  accent-color: var(--color-accent);
+}
+
+/* A legenda: o nome de cada fase embaixo do pedaço dela. A largura de cada um vem da missão
+   (flex-grow, posto pelo componente); a base zero faz as larguras seguirem só esse peso. */
+.mission-track__phases {
+  display: flex;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.mission-track__phase {
+  flex-basis: 0;
+  min-width: 0;
+  padding-top: var(--space-1);
+  border-top: 1px solid var(--color-border-control);
+  color: var(--color-text-muted);
+  font-size: var(--font-size-xs);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.mission-track__phase + .mission-track__phase {
+  padding-left: var(--space-2);
+  border-left: 1px solid var(--color-border-control);
+}
+
+.mission-track__phase[data-done='true'] {
+  border-top-color: var(--color-accent);
+  color: var(--color-text-secondary);
+}
+
+.mission-track__phase[aria-current='step'] {
+  border-top-color: var(--color-accent);
+  color: var(--color-accent);
+  font-weight: var(--font-weight-medium);
+}
+
+/* Num trilho estreito os nomes das fases não cabem embaixo dos pedaços (a subida tem um nono do
+   trilho), e cortados com reticências não diziam nada. Os nomes saem da vista e ficam para o
+   leitor de tela; na tela sobra a barra dos seis pedaços, mais grossa, com o de agora na cor de
+   destaque. A fase de agora, por extenso, está no cartão de voo. */
+@container (max-width: 42rem) {
+  .mission-track__phase-name {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip-path: inset(50%);
+    white-space: nowrap;
+  }
+
+  .mission-track__phase {
+    padding-top: 0;
+    border-top-width: var(--space-1);
+  }
+
+  .mission-track__phase + .mission-track__phase {
+    padding-left: 0;
+  }
+}
+
+/* O cartão de voo, por cima da cena: a fase, o tempo de missão em destaque e os números. */
+.mission-telemetry {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+  padding: var(--space-3) var(--space-4);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  background: var(--color-surface);
+}
+
+.mission-telemetry__phase {
+  color: var(--color-accent);
+  font-size: var(--font-size-sm);
+  font-weight: var(--font-weight-medium);
+}
+
+.mission-telemetry__time {
+  font-size: var(--font-size-lg);
+  font-weight: var(--font-weight-medium);
+  font-variant-numeric: tabular-nums;
+}
+
+.mission-telemetry__numbers {
+  color: var(--color-text-secondary);
+  font-size: var(--font-size-sm);
+  font-variant-numeric: tabular-nums;
+}
+
+/* O mapa do trajeto inteiro, no canto de cima da cena, abaixo do seletor de vista. */
+.mission-map {
+  position: absolute;
+  top: var(--space-8);
+  right: var(--space-3);
+  z-index: var(--z-panel);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+  width: calc(var(--panel-width) * 0.5);
+  margin: 0;
+  padding: var(--space-2);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  background: var(--color-surface);
+  pointer-events: none;
+}
+
+.mission-map__svg {
+  display: block;
+  width: 100%;
+  height: auto;
+}
+
+/* As linhas têm a largura em pixels da tela, e não em km do mapa (vector-effect). */
+.mission-map__orbit,
+.mission-map__path,
+.mission-map__flown {
+  fill: none;
+  vector-effect: non-scaling-stroke;
+}
+
+.mission-map__orbit {
+  stroke: var(--color-border-control);
+  stroke-width: 1;
+}
+
+.mission-map__path {
+  stroke: var(--color-accent);
+  stroke-width: 1;
+  stroke-opacity: 0.35;
+}
+
+.mission-map__flown {
+  stroke: var(--color-accent);
+  stroke-width: 2;
+}
+
+.mission-map__earth {
+  fill: var(--color-earth);
+}
+
+.mission-map__moon {
+  fill: var(--color-moon);
+}
+
+.mission-map__craft {
+  fill: var(--color-text);
+}
+
+.mission-map__caption {
+  color: var(--color-text-muted);
+  font-size: var(--font-size-xs);
+}
+
+/* Em tela de celular o mapa encolhe e fica sem a legenda (o nome dele, para o leitor de tela,
+   continua): do tamanho inteiro ele cobria o cartão de voo. */
+@media (max-width: 600px) {
+  .mission-map {
+    width: calc(var(--panel-width) * 0.28);
+    padding: var(--space-1);
+  }
+
+  .mission-map__caption {
+    display: none;
+  }
+}
+
+/* O resumo do pouso, na cor de coisa que deu certo. */
+.mission-complete {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-3) var(--space-8);
+  padding: var(--space-4);
+  border: 1px solid var(--color-success);
+  border-radius: var(--radius-md);
+  background: var(--color-success-surface);
+}
+
+.mission-complete__title {
+  margin: 0;
+  color: var(--color-success);
+  font-size: var(--font-size-md);
+  font-weight: var(--font-weight-medium);
+}
+
+.mission-complete__facts {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-3) var(--space-8);
+  margin: 0;
+}
+
+.mission-complete__facts dt {
+  color: var(--color-text-muted);
+  font-size: var(--font-size-xs);
+}
+
+.mission-complete__facts dd {
+  margin: var(--space-1) 0 0;
+  font-size: var(--font-size-lg);
+  font-variant-numeric: tabular-nums;
+}

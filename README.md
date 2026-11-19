@@ -83,6 +83,23 @@ installs everything on Windows, from scratch.
   to the landing; a camera button follows the spacecraft; and the numbers of the mission are
   listed: the launch time and direction, the three burns, the crossing and the landing time. The
   texts say what is real, what is drawn and which numbers are choices of the model.
+- Mission control, over that scene (card C17, in progress): in the Mission view the scene takes
+  the whole width, and the site panel leaves the page. Three labels, one per step, and one card
+  with only the open step: where to land (a pin of a known site on the Moon, or any other point of
+  it, with a click), when to land (one card per landing window of that site) and where to launch
+  from (a click on the mark of a pad on the Earth). The camera goes by itself to the south pole
+  of the Moon or to the Earth, where one chooses, and the lists stay folded in the card, for the
+  keyboard. With the three done, a Launch button plays the mission from the pad. In
+  flight there is one track for time, from the Earth to the Moon, with a piece for each of the
+  six phases; a card with the mission time, the height and the speed of the spacecraft, taken
+  from the computed path; the flown part of the line drawn stronger than the rest; a camera
+  that places itself in each phase, with the Earth behind the spacecraft and then the Moon ahead
+  of it, and a "Free camera" button that lets go of it; a small map of the whole path, to scale,
+  in a corner; and, at the landing, a summary with the total time and the sum of the three
+  burns. On a narrow screen the track takes a line of its own and the badge and the summary go
+  under the scene; the keyboard focus follows the steps instead of being lost; and a screen
+  reader hears each change of phase. The numbers and the notes are folded under "Mission
+  details".
 - The orbit propagator of the engine (`src/engine/orbit.js`, card C14): given a position, a speed
   and an instant, where a spacecraft is later, under the gravity of the Earth, the Moon and the
   Sun, each in its real position. Checked against the flown path of Artemis I, from JPL Horizons:
@@ -358,6 +375,7 @@ umbraview/
 │   │   ├── useFarRelief.js          the pole's coarse terrain, for the scene mesh (card C2)
 │   │   ├── useGlobalTiles.js        the whole-Moon terrain tiles around the camera (exp/lua-inteira-com-relevo)
 │   │   ├── useLandingAreas.js       the map of areas with a landing window on the date, computed in a Worker
+│   │   ├── useKeepFocus.js          takes the keyboard focus to a target when the control that had it leaves the page (card C17)
 │   │   ├── useMission.js            the reference mission for a launch site, a landing site and a window, computed in a Worker (card C15)
 │   │   ├── useNearTiles.js          the fine terrain tiles around the camera (card C6)
 │   │   ├── useSiteSky.js            the sky of the chosen site, with the calculation status
@@ -389,6 +407,10 @@ umbraview/
 │   │   ├── LandingAreasLayer.jsx    the map of areas with a landing window, painted over the Moon
 │   │   ├── LunarScene.css
 │   │   ├── LunarScene.jsx           the Moon, the Sun's light for the date and the camera that rotates with the mouse
+│   │   ├── MissionControl.css
+│   │   ├── MissionControl.jsx       mission control, over the scene: a label per step, the card of the open step and the Launch button (card C17)
+│   │   ├── MissionFlight.jsx        the flight panel: the track of the mission, the flight card and the summary at the landing (card C17)
+│   │   ├── MissionMap.jsx           the small map of the flight, in a corner of the scene: the whole path to scale, with the spacecraft (card C17)
 │   │   ├── MissionView.css
 │   │   ├── MissionView.jsx          the mission view: the Earth and the Moon to scale, with the launch sites on the Earth (card C13)
 │   │   ├── MoonGlobe.jsx            the whole-Moon sphere, with its real color and terrain
@@ -408,8 +430,9 @@ umbraview/
 │   │   ├── ViewClock.css
 │   │   ├── ViewClock.jsx            the row of controls of those two views: play, the clock cursor and the hour
 │   │   ├── cssToken.js              the value of a token of tokens.css, for the colors the 3D drawing needs
+│   │   ├── missionMap.js            the numbers of the small map of the flight: the crossing, the orbit of the Moon and the frame, in km (card C17)
 │   │   ├── missionPath.js           the path of the mission for the drawing: the spacecraft at an instant, the events and the camera that follows it (card C16)
-│   │   ├── missionPicking.js        the click on the mark of a launch site: which site it chooses
+│   │   ├── missionPicking.js        the clicks of the mission view: on the mark of a launch site, and on the Moon, which chooses the landing site
 │   │   ├── missionScale.js          the scale of the mission view, and where and how big the mark of a launch site is
 │   │   ├── useBodyTexture.js        the image of a body becoming a texture, for the Earth and the Moon
 │   │   ├── additiveLight.js         the blending of lights that add onto the background: the stars and the Sun's glow

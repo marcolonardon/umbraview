@@ -1,28 +1,32 @@
-/* A vista da missão (cards C13 e C16): a Terra e a Lua em escala, com as bases de lançamento
+/* A vista da missão (cards C13, C16 e C17): a Terra e a Lua em escala, com as bases de lançamento
  * marcadas na Terra, cada uma na latitude e na longitude de verdade, e o caminho de uma missão da
  * base escolhida até o local de pouso escolhido na Lua.
  *
  * A escala é a de verdade (missionScale.js), porque a órbita de espera fica a 185 km do chão: a Lua
- * fica a uns 60 raios da Terra, e a Terra vira um ponto quando a órbita inteira cabe na tela. Os
- * botões de câmera levam de volta à Terra, à Lua e à nave.
+ * fica a uns 60 raios da Terra. Em escala, ou se vê a nave ou se vê o trajeto inteiro; por isso a
+ * câmera vai sozinha aonde importa em cada momento, e voando o trajeto inteiro fica num mapa
+ * pequeno no canto (MissionMap.jsx).
+ *
+ * A vista tem dois modos. Planejando, o painel da missão (MissionControl.jsx) fica por cima da
+ * cena, um passo por vez, e a câmera vai ao polo sul da Lua ou à Terra, onde se escolhe. Voando,
+ * depois do Launch, ficam o trilho da missão, o cartão de voo e o mapa (MissionFlight.jsx), e a
+ * câmera acompanha a nave.
  *
  * As posições e as rotações são do motor: a Terra e a Lua, do src/engine/system.js; cada base, do
  * src/engine/earthSite.js; e a missão, do src/engine/mission.js, pela ponte (useMission). Aqui não
- * tem conta de órbita.
- *
- * O relógio é próprio, como o da vista do sistema: anda sem mudar a data do cálculo. Sem missão,
- * ele cobre o período, a partir da data escolhida. Com a missão na tela, cobre a missão, do
+ * tem conta de órbita. O relógio da missão não muda a data do cálculo: anda pelo trilho, do
  * lançamento ao pouso, e a Terra, a Lua e a nave são desenhadas no instante dele.
  */
 import { Html, Line } from '@react-three/drei'
 import { Canvas, useFrame } from '@react-three/fiber'
-import { useMemo, useRef, useState } from 'react'
+import { useLayoutEffect, useMemo, useRef, useState } from 'react'
 import { Matrix4 } from 'three'
 
 import { missionView } from '../data/missionView.js'
 import { MISSION, PERIOD_DAYS } from '../engine/config.js'
 import { EARTH_EQUATORIAL_RADIUS_KM, EARTH_SIDEREAL_DAY_HOURS, earthSiteKm } from '../engine/earthSite.js'
 import { ECLIPTIC_SKY_MATRIX, moonOrbitPath, systemStateAt } from '../engine/system.js'
+import { useKeepFocus } from '../hooks/useKeepFocus.js'
 import { useMission } from '../hooks/useMission.js'
 import { usePrefersReducedMotion } from '../hooks/usePrefersReducedMotion.js'
 import { useViewClock } from '../hooks/useViewClock.js'
@@ -30,42 +34,45 @@ import { formatDuration, formatUtc, formatUtcDate } from '../panel/format.js'
 import { token } from './cssToken.js'
 import { EarthBody } from './EarthBody.jsx'
 import { sunSideStart } from './framing.js'
-import { craftCamera, missionEvents, pathLength, segmentUnits, spacecraftAt } from './missionPath.js'
-import { readSiteClick } from './missionPicking.js'
+import { LAUNCH_STEP, MissionControl } from './MissionControl.jsx'
+import { MissionComplete, MissionTelemetry, MissionTrack, TRACK_STEPS } from './MissionFlight.jsx'
+import { mapPoint, missionMap } from './missionMap.js'
+import { MissionMap } from './MissionMap.jsx'
+import {
+  craftCamera, craftViewDirection, flownPoints, landingViewDirection, launchViewDirection, missionEvents, nextEvent, pathLength,
+  segmentUnits, spacecraftAt, telemetryAt, timeAtTrack, trackLayout,
+} from './missionPath.js'
+import { landingMarkerPosition, readLandingClick, readSiteClick } from './missionPicking.js'
 import {
   EARTH_RADIUS, MARKER_LIFT, MOON_RADIUS, facesCamera, kmToUnits, markerPosition, markerScale,
 } from './missionScale.js'
 import { MoonBody } from './MoonBody.jsx'
+import { CLICK_MAX_DRAG_PX } from './picking.js'
 import { StarField } from './StarField.jsx'
-import { ViewClock } from './ViewClock.jsx'
 import { ZoomControls } from './ZoomControls.jsx'
 // o mesmo esqueleto da vista do sistema (a cena, a camada dos nomes, os números e as notas)
 import './SystemView.css'
 import './MissionView.css'
 
 const HOUR_MS = 3600e3
-const PERIOD_HOURS = PERIOD_DAYS * 24
-/* Tocando, 6 horas por segundo: a Terra dá uma volta a cada 4 segundos, devagar o bastante para
-   acompanhar uma base com o olho, e o período inteiro passa em 2 minutos. No ritmo da vista do
-   sistema (30 horas por segundo) a Terra daria mais de uma volta por segundo e viraria um borrão. */
-const PLAY_HOURS_PER_SECOND = 6
-/* Com a missão na tela, o cursor do relógio anda de 6 em 6 minutos: a subida leva 10 minutos e a
-   espera na órbita da Terra pode levar menos de 10, e de hora em hora as duas sumiriam entre dois
-   passos. */
-const MISSION_STEP_HOURS = 0.1
-/* Tocando a missão, 2 horas por segundo: os quatro dias e meio passam em menos de 1 minuto, e cada
-   volta na órbita lunar, que leva 2 horas, dura 1 segundo. */
-const MISSION_PLAY_HOURS_PER_SECOND = 2
+/* Tocando, a missão inteira leva estes segundos, do lançamento ao pouso. O relógio anda pelo
+   trilho, e não pelo tempo: cada fase leva na tela a parte do trilho que ela ocupa (a subida e o
+   pouso, 5 segundos cada; a travessia, 15). Andando pelo tempo, a 2 horas por segundo, a subida
+   passava em um décimo de segundo. */
+const MISSION_PLAY_SECONDS = 45
+// a velocidade rápida: a missão inteira em 11 segundos, para quem quer ver de novo
+const FAST_FACTOR = 4
+// quanto da cor fica na parte da linha que a nave ainda não voou
+const REMAINING_OPACITY = 0.3
 
 /* A câmera nasce perto da Terra, que é onde as bases estão. O near é curto porque dá para chegar a
    menos de meio raio da Lua do chão dela; o far cobre a órbita inteira vista de longe. */
 const CAMERA = { position: [0, 1.4, 4], fov: 35, near: 0.02, far: 3000 }
-/* Para onde cada botão de câmera leva: o alvo, de que distância ele é visto e até onde dá para
-   chegar perto, tudo em raios da Terra. De 230 raios a órbita inteira da Lua cabe na tela. */
+/* Os alvos da câmera: de que distância cada um é visto e até onde dá para chegar perto, em raios
+   da Terra. Quem escolhe o alvo é o passo aberto no painel e, voando, a nave. */
 const CAMERA_VIEWS = {
   earth: { distance: Math.hypot(...CAMERA.position), minDistance: 1.25 },
   moon: { distance: 1.3, minDistance: 0.4 },
-  orbit: { distance: 230, minDistance: 1.25 },
   /* A nave: só existe com a missão na tela, e a câmera vai junto com ela. Perto da Terra e da Lua
      o limite de perto cresce, para a câmera não cair dentro do corpo (craftCamera). */
   craft: { distance: 2, minDistance: 0.3 },
@@ -106,6 +113,26 @@ const CRAFT_RADIUS_PER_DISTANCE = 0.005
 /* Até que distância da câmera o nome de um evento aparece, em raios da Terra: de mais longe os
    dois da Terra ficam em cima um do outro e do nome dela, e os dois da Lua, do nome da Lua. */
 const EVENT_TAG_MAX_DISTANCE = 12
+/* No passo do pouso a câmera olha o polo sul da Lua, e não o centro dela: do centro, com a câmera
+   20° fora do eixo, o polo ficava fora da tela (visto no navegador). O alvo é o ponto do polo no
+   chão, e a câmera fica a esta distância dele, em raios da Terra (o raio da Lua é 0,27): daí os
+   dez locais conhecidos, que ficam a até 6,4° do polo, cabem na altura da cena, e os dois mais
+   próximos um do outro ficam a uns 13 pixels. */
+const LANDING_VIEW = { distance: 0.15, minDistance: 0.05 }
+/* Em volta do polo, a câmera não sobe além do horizonte dele: mais que isso ela entraria na Lua.
+   É o ângulo a partir do "para cima" do desenho, que é quase o polo norte da Lua. */
+const LANDING_MIN_POLAR_ANGLE = Math.PI / 2
+// o ponto da nave durante o voo, em vezes o tamanho de base: é o que o olho tem que achar primeiro
+const CRAFT_SIZE = 1.6
+// o tamanho de um pino e do local escolhido, em vezes o tamanho de base
+const PIN_SIZE = 1.2
+const SELECTED_PIN_SIZE = 2
+// a borda escura de um ponto, em vezes o tamanho dele
+const RIM_SCALE = 1.35
+// a área de clique de um pino, em vezes o ponto da nave: uns 30 pixels de largura na tela
+const PIN_HIT_SIZE = 3
+// no passo da base, as marcas das bases ficam maiores: é nelas que se clica
+const PAD_STEP_SCALE = 1.8
 
 /* O nome de um evento da missão, preso ao ponto do caminho em que ele acontece. position: o ponto,
    nas unidades do desenho. raised: o nome fica acima do ponto, e não abaixo. Some de longe
@@ -126,36 +153,100 @@ function EventTag({ position, text, raised = false, labels }) {
   )
 }
 
-/* A nave no instante do relógio: um ponto que tem sempre o mesmo tamanho na tela, com o nome. */
-function Spacecraft({ position, labels }) {
+/* Um ponto que tem sempre o mesmo tamanho na tela, de perto e de longe: a nave e o local de pouso.
+   Cor sem luz (meshBasicMaterial), para aparecer também do lado da noite.
+   rimmed: o ponto ganha uma borda escura (card C17, fase 5). Sem ela, o âmbar de um pino no chão
+   claro da Lua e o branco da nave sobre as nuvens da Terra quase somem: o contraste entre as duas
+   cores fica perto de 1,3 para 1, e a WCAG pede 3 para 1 no que se precisa achar (1.4.11). A borda
+   é uma esfera maior, na cor do fundo, e o ponto fica na frente dela, um pouco para o lado da
+   câmera, a cada quadro. */
+function ScreenDot({ position, color, size = 1, userData, rimmed = false }) {
   const dot = useRef(null)
+  const rim = useRef(null)
   useFrame(({ camera }) => {
-    if (dot.current) dot.current.scale.setScalar(camera.position.distanceTo(dot.current.position) * CRAFT_RADIUS_PER_DISTANCE)
+    if (!dot.current) return
+    const [x, y, z] = position
+    const toCamera = [camera.position.x - x, camera.position.y - y, camera.position.z - z]
+    const distance = Math.hypot(...toCamera)
+    const scale = distance * CRAFT_RADIUS_PER_DISTANCE * size
+    dot.current.scale.setScalar(scale)
+    if (!rim.current) return
+    rim.current.scale.setScalar(scale * RIM_SCALE)
+    const lift = (scale * RIM_SCALE) / distance
+    dot.current.position.set(x + toCamera[0] * lift, y + toCamera[1] * lift, z + toCamera[2] * lift)
   })
   return (
     <>
-      <mesh ref={dot} position={position}>
+      <mesh ref={dot} position={position} userData={userData}>
         <sphereGeometry args={[1, 16, 8]} />
-        <meshBasicMaterial color={token('--color-text')} />
+        {/* sem cor, é uma área de clique: não desenha nada, só existe para o raio do clique acertar */}
+        {color ? <meshBasicMaterial color={token(color)} /> : <meshBasicMaterial colorWrite={false} depthWrite={false} />}
       </mesh>
-      <Html position={position} center pointerEvents="none" zIndexRange={[1, 0]} portal={labels}>
-        <span className="system-view__tag mission-view__craft-tag">{missionView.spacecraft}</span>
-      </Html>
+      {rimmed && (
+        <mesh ref={rim} position={position}>
+          <sphereGeometry args={[1, 16, 8]} />
+          <meshBasicMaterial color={token('--color-bg')} />
+        </mesh>
+      )}
     </>
   )
 }
 
-// uma linha do caminho da missão: cheia no que é conta, tracejada no que é desenho
-function PathLine({ line }) {
+/* Os locais de pouso conhecidos, como pinos na Lua (card C17, fase 2): um ponto por local, com o
+   nome ao passar o mouse, e o clique escolhe o local. sites: os locais. positions: onde fica cada
+   um, no desenho. onPick: chamada com o local clicado. O escolhido ganha a marca maior do local
+   de pouso, que o MissionBodies desenha por cima.
+   Os pinos do outro lado da Lua não respondem: o raio do clique acerta a Lua antes, e ela segura o
+   evento (MissionBodies). */
+function SitePins({ sites, positions, onPick, labels }) {
+  const [hovered, setHovered] = useState(-1)
+  const indexOf = (event) => event.object.userData.pinIndex
   return (
-    <Line
-      points={line.points}
-      color={token('--color-accent')}
-      lineWidth={PATH_WIDTH}
-      dashed={line.dash > 0}
-      dashSize={line.dash}
-      gapSize={line.dash}
-    />
+    <>
+      {sites.map((site, i) => (
+        // na cor de destaque: o branco das marcas das bases some no cinza claro da Lua
+        <ScreenDot key={site.id} position={positions[i]} color="--color-accent" size={PIN_SIZE} rimmed />
+      ))}
+      <group
+        onClick={(event) => {
+          event.stopPropagation()
+          // o fim de um arrasto não é clique, pelo mesmo limite dos outros cliques da cena
+          if (event.delta <= CLICK_MAX_DRAG_PX) onPick(sites[indexOf(event)])
+        }}
+        onPointerOver={(event) => {
+          event.stopPropagation()
+          event.nativeEvent.target.style.cursor = 'pointer'
+          setHovered(indexOf(event))
+        }}
+        onPointerOut={() => setHovered(-1)}
+      >
+        {sites.map((site, i) => (
+          <ScreenDot key={site.id} position={positions[i]} size={PIN_HIT_SIZE} userData={{ pinIndex: i }} />
+        ))}
+      </group>
+      {hovered >= 0 && <EventTag position={positions[hovered]} text={sites[hovered].name} raised labels={labels} />}
+    </>
+  )
+}
+
+
+// uma linha do caminho da missão: cheia no que é conta, tracejada no que é desenho
+function PathLine({ line, flown }) {
+  /* flown: quantos pontos do trecho a nave já voou, ou null planejando, quando a linha é uma prévia
+     e aparece inteira. Voando, a linha é desenhada duas vezes: inteira e fraca, e por cima forte
+     só até onde a nave chegou. A forte é a mesma linha com menos pedaços desenhados (um pedaço
+     entre cada dois pontos), sem refazer a geometria a cada quadro. Depois de cada desenho do
+     React, e não só quando flown muda: a linha do Drei refaz a geometria quando os pontos trocam. */
+  const strong = useRef(null)
+  useLayoutEffect(() => {
+    if (strong.current) strong.current.geometry.instanceCount = flown === null ? Infinity : Math.max(0, flown - 1)
+  })
+  const look = { points: line.points, color: token('--color-accent'), lineWidth: PATH_WIDTH, dashed: line.dash > 0, dashSize: line.dash, gapSize: line.dash }
+  return (
+    <>
+      {flown !== null && <Line {...look} transparent opacity={REMAINING_OPACITY} />}
+      <Line ref={strong} {...look} />
+    </>
   )
 }
 
@@ -168,10 +259,25 @@ function PathLine({ line }) {
    path: o caminho da missão já nas unidades do desenho, { lines, events }, ou null sem missão.
    craft: a nave no instante do relógio, { center, position }, ou null. O que é contado da Lua
    (center 'moon') é desenhado a partir da posição dela naquele instante, e anda com ela.
-   missionKey: o que identifica a missão na tela (o instante do lançamento), ou null sem missão. */
+   missionKey: o que identifica a missão na tela (o instante do lançamento), ou null sem missão.
+   landingSite: o local de pouso escolhido, { lat, lon }, ou null. onPickLanding: chamada com
+   { lat, lon } quando a pessoa clica num ponto da Lua (card C17). launchKey: quantas vezes a
+   pessoa lançou; quando muda, a câmera da nave se põe em cima da base. upcoming: voando, o
+   próximo evento da missão, o único que ganha nome na cena; planejando, null: a linha é só uma prévia.
+   knownSites: os locais de pouso conhecidos. step: o passo aberto no painel, ou null voando: no do
+   pouso (0) a câmera olha o polo sul da Lua e os locais conhecidos viram pinos; no da base (2) as
+   marcas das bases crescem. Voando, só a base escolhida aparece, e a cena não escolhe nada.
+   flown: voando, quantos pontos de cada trecho a nave já voou, por fase; planejando, null.
+   craftTick: o passo do trilho em que a missão está; é o que faz a câmera da nave acompanhá-la.
+   freeCamera: a pessoa soltou a câmera; ela vai junto com a nave, mas não se põe sozinha. */
 function MissionBodies({
   state, orbit, sites, markers, selectedIndex, faceSelected, onPick, dateUtc, reducedMotion, cameraView, labels, path, craft, missionKey,
+  landingSite, onPickLanding, launchKey, upcoming, knownSites, step, flown, craftTick, freeCamera,
 }) {
+  const planning = step !== null
+  // no passo do pouso, a câmera da Lua olha o polo sul de perto, onde estão os locais conhecidos
+  const poleView = cameraView === 'moon' && step === 0
+  const [hoveredPad, setHoveredPad] = useState(-1)
   const moonPosition = kmToUnits(state.moonKm)
   const fromCenter = (center, [x, y, z]) =>
     center === 'moon' ? [moonPosition[0] + x, moonPosition[1] + y, moonPosition[2] + z] : [x, y, z]
@@ -193,9 +299,18 @@ function MissionBodies({
   /* As marcas e, depois delas, as áreas de clique, na ordem das bases: o tamanho de cada uma
      acompanha a distância da câmera até ela. */
   const markerMeshes = useRef([])
+  /* Um nome por vez (card C17, fase 5): quando o próximo evento é na Lua e a câmera está perto
+     dela, o nome do evento aparece em cima da Lua, e o nome "Moon" ficava por baixo dele, os dois
+     ilegíveis. De perto, quem fala é o evento; de longe, onde o nome do evento some, é a Lua. */
+  const moonTag = useRef(null)
+  const eventOnMoon = upcoming?.center === 'moon'
   useFrame(({ camera }) => {
     for (const mesh of markerMeshes.current) {
       if (mesh) mesh.scale.setScalar(markerScale(camera.position.distanceTo(mesh.position)))
+    }
+    if (moonTag.current) {
+      const fromMoon = Math.hypot(camera.position.x - moonPosition[0], camera.position.y - moonPosition[1], camera.position.z - moonPosition[2])
+      moonTag.current.style.visibility = eventOnMoon && fromMoon < EVENT_TAG_MAX_DISTANCE ? 'hidden' : 'visible'
     }
     if (!siteTag.current || !selected) return
     const position = camera.position.toArray()
@@ -211,7 +326,31 @@ function MissionBodies({
           earthClearance: CAMERA_VIEWS.earth.minDistance,
           moonClearance: CAMERA_VIEWS.moon.minDistance,
         })
-      : CAMERA_VIEWS[cameraView]
+      : poleView
+        ? LANDING_VIEW
+        : CAMERA_VIEWS[cameraView]
+  // o polo sul da Lua no chão: o alvo da câmera no passo do pouso (a coluna 1 da matriz é o polo norte)
+  const poleTarget = [1, 2, 3].map((k) => moonPosition[k - 1] - state.moonMatrix[3 + k] * MOON_RADIUS)
+  /* No passo do pouso, a câmera da Lua vai olhar o polo sul de perto (landingViewDirection). Só a
+     entrada no passo move a câmera: depois quem manda é a pessoa. */
+  const moonFacing = useMemo(
+    () => (step === 0 ? { key: 'landing', direction: landingViewDirection(state.moonMatrix, state.sunDirection) } : null),
+    [step, state],
+  )
+  /* No passo da base, sem base escolhida, a câmera da Terra vai para o lado do dia, ao norte do
+     equador, onde estão quase todas as bases (launchViewDirection). Com uma base escolhida, quem
+     manda é ela (facing, mais abaixo). */
+  const padsFacing = useMemo(
+    () => (step === 2 ? { key: 'pads', direction: launchViewDirection(state.earthMatrix, state.sunDirection) } : null),
+    [step, state],
+  )
+  // os pinos dos locais conhecidos, presos à Lua
+  const pinPositions = useMemo(
+    () => knownSites.map((site) => landingMarkerPosition(site, state.moonMatrix).map((value, k) => value + moonPosition[k])),
+    // a posição da Lua sai do mesmo state
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [knownSites, state],
+  )
   /* Escolher uma base na lista vira a câmera para ela (ZoomControls.jsx). A direção acompanha a
      base, que gira com a Terra; a câmera só se move quando a base escolhida troca. Quem clicou na
      marca já está olhando para ela: aí a câmera fica onde está.
@@ -225,6 +364,24 @@ function MissionBodies({
         : null,
     [selected, faceSelected, missionKey, sites, selectedIndex],
   )
+
+  /* A câmera que conta a história: voando, ela se põe sozinha, de um jeito por fase
+     (craftViewDirection), e acompanha a nave a cada passo do trilho. Sem isto a câmera ficava
+     parada em relação à nave, e a nave, dando a volta, sumia atrás do corpo (visto no navegador:
+     a tela toda de mar na órbita de espera). Com a câmera livre ela continua indo junto com a
+     nave, mas quem a gira e aproxima é a pessoa. */
+  const craftFacing = useMemo(() => {
+    if (!craft || !craftPosition || freeCamera) return null
+    const direction = craftViewDirection({
+      phase: craft.phase,
+      fromEarth: craftPosition,
+      fromMoon: craftPosition.map((value, k) => value - moonPosition[k]),
+      phaseProgress: craft.phaseProgress,
+    })
+    return { key: `${launchKey} ${craftTick}`, direction }
+    // a posição da nave e a da Lua saem do craft e do state
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [craft, state, freeCamera, launchKey, craftTick])
 
   /* O clique numa marca escolhe a base (missionPicking.js). O raio do clique só enxerga as áreas
      de clique, que são as únicas com quem ouve o evento: a Terra não entra, e é a regra do
@@ -240,12 +397,32 @@ function MissionBodies({
      cá da Terra: do outro lado o clique não faz nada. O cursor é posto no elemento em que o mouse
      está, que o próprio evento entrega: o canvas da cena. */
   function handleSiteOver(event) {
-    const marker = markers[siteIndexOf(event)]
-    if (marker && facesCamera(marker, event.camera.position.toArray())) event.nativeEvent.target.style.cursor = 'pointer'
+    const index = siteIndexOf(event)
+    const marker = markers[index]
+    if (!marker || !facesCamera(marker, event.camera.position.toArray())) return
+    event.nativeEvent.target.style.cursor = 'pointer'
+    // o nome da base em que o mouse está: as marcas são pontos iguais, e é o nome que as distingue
+    setHoveredPad(index)
   }
   function handleSiteOut(event) {
     event.nativeEvent.target.style.cursor = ''
+    setHoveredPad(-1)
   }
+
+  /* O clique na Lua escolhe o local de pouso (missionPicking.js): qualquer ponto dela, como na
+     vista da Lua. A mãozinha em cima dela diz que dá para clicar. */
+  function handleMoonClick(event) {
+    event.stopPropagation()
+    const site = readLandingClick({ point: event.point.toArray(), delta: event.delta }, moonPosition, state.moonMatrix)
+    if (site) onPickLanding(site)
+  }
+  // a Lua segura o evento: o que está atrás dela (um pino do outro lado) não responde ao mouse
+  function handleMoonOver(event) {
+    event.stopPropagation()
+    event.nativeEvent.target.style.cursor = 'pointer'
+  }
+  // a marca do local de pouso, presa à Lua: anda e gira com ela
+  const landingMarker = landingSite && fromCenter('moon', landingMarkerPosition(landingSite, state.moonMatrix))
 
   return (
     <>
@@ -254,7 +431,8 @@ function MissionBodies({
       <ambientLight intensity={AMBIENT_INTENSITY} />
       <directionalLight position={sun.map((v) => v * LIGHT_DISTANCE)} intensity={SUN_INTENSITY} color={token('--color-sunlight')} />
 
-      <EarthBody radius={EARTH_RADIUS} matrix={earthMatrix} sunDirection={sun} />
+      {/* as linhas dos eixos ajudam a ler a Terra e a Lua paradas; voando, são ruído em volta da linha da missão */}
+      <EarthBody radius={EARTH_RADIUS} matrix={earthMatrix} sunDirection={sun} showAxis={planning} />
       <Html position={[0, -EARTH_RADIUS * 1.25, 0]} center pointerEvents="none" zIndexRange={[1, 0]} portal={labels}>
         <span className="system-view__tag">{missionView.earth}</span>
       </Html>
@@ -262,36 +440,46 @@ function MissionBodies({
       {/* As bases. Cor sem luz (meshBasicMaterial): a marca tem que aparecer também do lado da
           noite. A posição já vem do motor no instante do relógio, e por isso as marcas ficam fora
           do grupo que gira com a Terra. */}
-      {markers.map((position, i) => (
-        <mesh
-          key={sites[i].id}
-          position={position}
-          ref={(mesh) => {
-            markerMeshes.current[i] = mesh
-          }}
-        >
-          <sphereGeometry args={[i === selectedIndex ? SELECTED_MARKER_RADIUS : MARKER_RADIUS, 16, 8]} />
-          <meshBasicMaterial color={token(i === selectedIndex ? '--color-accent' : '--color-text')} />
-        </mesh>
-      ))}
-      {/* A área de clique de cada marca: uma esfera maior que ela, que não desenha nada (não
-          escreve cor nem profundidade) e só existe para o raio do clique acertar. */}
-      <group onClick={handleSiteClick} onPointerOver={handleSiteOver} onPointerOut={handleSiteOut}>
-        {markers.map((position, i) => (
+      {markers.map((position, i) =>
+        // voando, só a base de onde a missão saiu: as outras são ruído em volta da linha
+        planning || i === selectedIndex ? (
           <mesh
             key={sites[i].id}
             position={position}
-            userData={{ siteIndex: i }}
             ref={(mesh) => {
-              markerMeshes.current[markers.length + i] = mesh
+              markerMeshes.current[i] = mesh
             }}
           >
-            <sphereGeometry args={[HIT_RADIUS, 12, 8]} />
-            <meshBasicMaterial colorWrite={false} depthWrite={false} />
+            <sphereGeometry args={[(i === selectedIndex ? SELECTED_MARKER_RADIUS : MARKER_RADIUS) * (step === 2 ? PAD_STEP_SCALE : 1), 16, 8]} />
+            <meshBasicMaterial color={token(i === selectedIndex ? '--color-accent' : '--color-text')} />
           </mesh>
-        ))}
-      </group>
-      {selected && (
+        ) : null,
+      )}
+      {/* A área de clique de cada marca: uma esfera maior que ela, que não desenha nada (não
+          escreve cor nem profundidade) e só existe para o raio do clique acertar. Só planejando:
+          voando, a cena não troca a missão. */}
+      {planning && (
+        <group onClick={handleSiteClick} onPointerOver={handleSiteOver} onPointerOut={handleSiteOut}>
+          {markers.map((position, i) => (
+            <mesh
+              key={sites[i].id}
+              position={position}
+              userData={{ siteIndex: i }}
+              ref={(mesh) => {
+                markerMeshes.current[markers.length + i] = mesh
+              }}
+            >
+              <sphereGeometry args={[HIT_RADIUS, 12, 8]} />
+              <meshBasicMaterial colorWrite={false} depthWrite={false} />
+            </mesh>
+          ))}
+        </group>
+      )}
+      {hoveredPad >= 0 && hoveredPad !== selectedIndex && markers[hoveredPad] && (
+        <EventTag position={markers[hoveredPad]} text={sites[hoveredPad].name} raised labels={labels} />
+      )}
+      {/* o nome da base escolhida, só planejando: voando, o nome que importa é o do próximo evento */}
+      {selected && planning && (
         <Html position={selected} center pointerEvents="none" zIndexRange={[1, 0]} portal={labels}>
           <span ref={siteTag} className="system-view__tag mission-view__site-tag">
             {sites[selectedIndex].name}
@@ -299,9 +487,26 @@ function MissionBodies({
         </Html>
       )}
 
-      <MoonBody radius={MOON_RADIUS} matrix={moonMatrix} />
+      {/* Planejando, a Lua é clicável: qualquer ponto dela pode ser o local de pouso. */}
+      <MoonBody
+        radius={MOON_RADIUS}
+        matrix={moonMatrix}
+        onClick={planning ? handleMoonClick : undefined}
+        onPointerOver={planning ? handleMoonOver : undefined}
+        onPointerOut={planning ? handleSiteOut : undefined}
+        // no passo do pouso a câmera olha o polo, e a linha do eixo atravessaria os pinos
+        showAxis={planning && step !== 0}
+      />
+      {step === 0 && <SitePins sites={knownSites} positions={pinPositions} onPick={onPickLanding} labels={labels} />}
+      {landingMarker && <ScreenDot position={landingMarker} color="--color-accent" size={SELECTED_PIN_SIZE} rimmed />}
+      {/* voando, o nome do pouso já está lá, no fim da linha */}
+      {landingMarker && planning && (
+        <EventTag position={landingMarker} text={landingSite.name ?? missionView.customLandingSite} labels={labels} />
+      )}
       <Html position={[moonPosition[0], moonPosition[1] - MOON_RADIUS * 1.6, moonPosition[2]]} center pointerEvents="none" zIndexRange={[1, 0]} portal={labels}>
-        <span className="system-view__tag">{missionView.moon}</span>
+        <span ref={moonTag} className="system-view__tag">
+          {missionView.moon}
+        </span>
       </Html>
       <Line points={orbitPoints} color={token('--color-text-secondary')} lineWidth={1.5} />
 
@@ -309,32 +514,34 @@ function MissionBodies({
           embaixo deles; os contados da Lua ficam num grupo preso à Lua. */}
       {path && (
         <>
-          {path.lines.filter((line) => line.center === 'earth').map((line) => <PathLine key={line.key} line={line} />)}
-          <group position={moonPosition}>
-            {path.lines.filter((line) => line.center === 'moon').map((line) => <PathLine key={line.key} line={line} />)}
-          </group>
-          {path.events.map((event) => (
-            <EventTag
-              key={event.key}
-              position={fromCenter(event.center, event.position)}
-              text={missionView.events[event.key]}
-              // o pouso e a chegada à Lua acontecem perto um do outro, no polo: um nome sobe e o outro desce
-              raised={event.key === 'landing'}
-              labels={labels}
-            />
+          {path.lines.filter((line) => line.center === 'earth').map((line) => (
+            <PathLine key={line.key} line={line} flown={flown ? flown[line.key] : null} />
           ))}
+          <group position={moonPosition}>
+            {path.lines.filter((line) => line.center === 'moon').map((line) => (
+              <PathLine key={line.key} line={line} flown={flown ? flown[line.key] : null} />
+            ))}
+          </group>
+          {/* Um nome de evento por vez: o do próximo, o lugar para onde a nave está indo. */}
+          {upcoming && (
+            <EventTag key={upcoming.key} position={fromCenter(upcoming.center, upcoming.position)} text={missionView.events[upcoming.key]} labels={labels} />
+          )}
         </>
       )}
-      {craftPosition && <Spacecraft position={craftPosition} labels={labels} />}
+      {/* A nave no instante do relógio: um ponto, sem nome. O cartão de voo já diz onde ela está, e
+          o nome em cima do ponto empilhava com os outros no lançamento. */}
+      {craftPosition && <ScreenDot position={craftPosition} color="--color-text" size={CRAFT_SIZE} rimmed />}
 
       <ZoomControls
         minDistance={view.minDistance}
         maxDistance={MAX_DISTANCE}
         reducedMotion={reducedMotion}
-        target={cameraView === 'moon' ? moonPosition : cameraView === 'craft' && craftPosition ? craftPosition : ORIGIN}
-        targetName={cameraView}
+        target={poleView ? poleTarget : cameraView === 'moon' ? moonPosition : cameraView === 'craft' && craftPosition ? craftPosition : ORIGIN}
+        // o polo e a Lua inteira são dois alvos: trocar de um para o outro desliza
+        targetName={poleView ? 'pole' : cameraView}
         distance={view.distance}
-        facing={cameraView === 'earth' || cameraView === 'orbit' ? facing : null}
+        facing={cameraView === 'craft' ? craftFacing : cameraView === 'moon' ? moonFacing : (facing ?? padsFacing)}
+        minPolarAngle={poleView ? LANDING_MIN_POLAR_ANGLE : 0}
       />
     </>
   )
@@ -348,10 +555,13 @@ function MissionBodies({
    da janela escolhida, em milissegundos UTC, ou null; sem escolha, ou se a janela guardada não
    existe mais, vale a primeira. onLandingWindowChange: chamada com o começo da janela que a pessoa
    escolhe na lista.
+   sites: os locais de pouso conhecidos (src/data/sites.js), para a lista do painel da missão.
+   onLandingSiteChange: chamada com o local escolhido, da lista ou do clique na Lua (card C17).
    Quem guarda as escolhas é o App.jsx, para elas não se perderem quando a pessoa troca de vista. */
 export function MissionView({
   dateUtc, launchSites, launchSiteId, onLaunchSiteChange,
   landingSite = null, skyStatus = 'idle', landingWindows = null, landingWindowStartMs = null, onLandingWindowChange,
+  sites = [], onLandingSiteChange = () => {},
 }) {
   const selectedIndex = launchSites.findIndex((site) => site.id === launchSiteId)
   const launchSite = launchSites[selectedIndex] ?? null
@@ -359,19 +569,47 @@ export function MissionView({
   const landingWindow = windows.find((item) => item.startUtc.getTime() === landingWindowStartMs) ?? windows[0] ?? null
   const { status: missionStatus, mission } = useMission(launchSite, landingSite, landingWindow)
 
-  /* O que o relógio cobre: a missão, do lançamento ao pouso, ou o período. O último passo do
-     cursor cai no pouso ou logo depois dele, e a volta ao começo, tocando, vem um passo adiante. */
+  /* O relógio da missão anda pelo trilho, em passos de 0 a TRACK_STEPS, e não pelo tempo: o
+     instante sai do lugar no trilho (timeAtTrack). O "hour" do useViewClock aqui é esse lugar.
+     Tocando, ele para no fim do trilho, que é o pouso, em vez de voltar ao lançamento; e volta ao
+     começo, parado, quando a missão troca. */
   const missionStartMs = mission ? mission.launchUtc.getTime() : null
-  const clockStartMs = missionStartMs ?? dateUtc.getTime()
-  const clockHours = mission
-    ? (Math.ceil((mission.landingUtc.getTime() - missionStartMs) / HOUR_MS / MISSION_STEP_HOURS) + 1) * MISSION_STEP_HOURS
-    : PERIOD_HOURS
-  const clock = useViewClock(clockHours, mission ? MISSION_PLAY_HOURS_PER_SECOND : PLAY_HOURS_PER_SECOND, missionStartMs ?? 'period')
+  const [fast, setFast] = useState(false)
+  // voando, a câmera se põe sozinha, a não ser que a pessoa a solte
+  const [freeCamera, setFreeCamera] = useState(false)
+  const clock = useViewClock(
+    TRACK_STEPS + 1,
+    (TRACK_STEPS / MISSION_PLAY_SECONDS) * (fast ? FAST_FACTOR : 1),
+    missionStartMs ?? 'period',
+    TRACK_STEPS,
+  )
+  const trackPosition = clock.hour / TRACK_STEPS
   const reducedMotion = usePrefersReducedMotion()
   const labels = useRef(null)
-  const [chosenCameraView, setCameraView] = useState('earth')
-  // a nave só existe com a missão: se a missão some com a câmera nela, a câmera volta para a Terra
-  const cameraView = chosenCameraView === 'craft' && !mission ? 'earth' : chosenCameraView
+  // para onde o foco do teclado vai quando o controle que o tinha sai da página (useKeepFocus, mais abaixo)
+  const focusTarget = useRef(null)
+  /* O passo aberto no painel: o que a pessoa reabriu clicando na etiqueta, ou, sem isso, o primeiro
+     que falta fazer; com os três feitos, o do lançamento. */
+  const [chosenStep, setChosenStep] = useState(null)
+  const firstUndone = [landingSite, landingWindow, launchSite].findIndex((choice) => !choice)
+  const openStep = chosenStep ?? (firstUndone === -1 ? LAUNCH_STEP : firstUndone)
+  /* A câmera vai aonde se escolhe: à Lua no passo do pouso, à Terra no da base. Começa assim, e
+     acompanha a troca de passo (vista durante o render, como a troca do relógio no useViewClock). */
+  const cameraOfStep = (step) => (step === 0 ? 'moon' : step === 2 ? 'earth' : null)
+  const [chosenCameraView, setCameraView] = useState(() => cameraOfStep(openStep) ?? 'earth')
+  const [stepOfCamera, setStepOfCamera] = useState(openStep)
+  if (stepOfCamera !== openStep) {
+    setStepOfCamera(openStep)
+    if (cameraOfStep(openStep)) setCameraView(cameraOfStep(openStep))
+  }
+  /* A missão que está voando: a que foi lançada. Trocar qualquer escolha muda a missão, e a vista
+     volta a planejar. */
+  const [flightKey, setFlightKey] = useState(null)
+  const flying = Boolean(mission) && flightKey === missionStartMs
+  // quantas vezes a pessoa lançou: a cada lançamento a câmera da nave se põe em cima da base
+  const [launchCount, setLaunchCount] = useState(0)
+  // a nave só tem câmera voando: se a missão some com a câmera nela, a câmera volta para a Terra
+  const cameraView = chosenCameraView === 'craft' && !flying ? 'earth' : chosenCameraView
   /* Se a câmera vira para a base escolhida. Sim quando a escolha vem da lista (ou já veio feita,
      de outra vista): a base pode estar do outro lado da Terra. Não quando vem do clique na marca:
      a pessoa já está olhando para ela, e a câmera andar sozinha tiraria a Terra do lugar. */
@@ -379,14 +617,19 @@ export function MissionView({
   /* A câmera nasce com o Sol de lado, pela direção dele na data em que a vista abriu: a Terra
      aparece meio iluminada, com a linha do dia e da noite à vista. Fica no estado, e não é
      recalculada: depois de aberta, quem manda na câmera é a pessoa. */
-  const [camera] = useState(() => ({
-    ...CAMERA,
-    position: sunSideStart(CAMERA.position, systemStateAt(dateUtc.getTime()).sunDirection),
-  }))
-  const dateMs = clockStartMs + clock.hour * HOUR_MS
+  const [camera] = useState(() => {
+    const position = sunSideStart(CAMERA.position, systemStateAt(dateUtc.getTime()).sunDirection)
+    /* Nascendo na Lua, a câmera já nasce à distância dela: os controles levam o alvo até a Lua
+       sem mexer na distância, e de 4 raios a Lua seria uma bolinha. */
+    const scale = chosenCameraView === 'moon' ? CAMERA_VIEWS.moon.distance / Math.hypot(...position) : 1
+    return { ...CAMERA, position: position.map((value) => value * scale) }
+  })
+  // o instante da cena: o do trilho, com a missão; sem ela, a data escolhida
+  const dateMs = mission ? timeAtTrack(mission.segments, trackPosition) : dateUtc.getTime()
   const state = useMemo(() => systemStateAt(dateMs), [dateMs])
-  // o mês da Lua a partir de onde o relógio começa: a missão começa dias antes da data escolhida
-  const orbit = useMemo(() => moonOrbitPath(clockStartMs, ORBIT_STEPS), [clockStartMs])
+  // o mês da Lua a partir do lançamento: a missão começa dias antes da data escolhida
+  const orbitStartMs = missionStartMs ?? dateUtc.getTime()
+  const orbit = useMemo(() => moonOrbitPath(orbitStartMs, ORBIT_STEPS), [orbitStartMs])
   const markers = useMemo(
     () => launchSites.map((site) => markerPosition(earthSiteKm(site.lat, site.lon, dateMs))),
     [launchSites, dateMs],
@@ -409,207 +652,274 @@ export function MissionView({
   const craft = useMemo(() => {
     if (!mission) return null
     const { phase, center, positionKm } = spacecraftAt(mission.segments, dateMs)
-    return { phase, center, position: kmToUnits(positionKm) }
+    const piece = trackLayout(mission.segments).find((item) => item.phase === phase)
+    // quanto da fase já passou, de 0 a 1: a câmera muda de lado no meio da travessia
+    const phaseProgress = piece.endMs > piece.startMs ? (dateMs - piece.startMs) / (piece.endMs - piece.startMs) : 0
+    return { phase, center, positionKm, position: kmToUnits(positionKm), phaseProgress }
   }, [mission, dateMs])
 
-  /* O que falta para haver uma missão, ou em que pé ela está: um texto só, o primeiro que se
-     aplica. Sem base escolhida não entra aqui: quem pede a base é a nota dela, mais abaixo. */
-  const notice =
-    !landingSite ? missionView.noLandingSite
+  /* O aviso do cartão do painel: o que impede o passo aberto de andar, ou em que pé a conta está.
+     No passo da janela, o que houve com as janelas do local; no do lançamento, a conta da missão.
+     Nos outros dois a pergunta do passo já diz o que fazer. */
+  const windowNotice =
+    !landingSite ? missionView.windowWaiting
     : skyStatus === 'loading' ? missionView.windowsLoading
     : skyStatus === 'error' ? missionView.windowsError
-    : skyStatus === 'ready' && windows.length === 0 ? missionView.noWindows
-    : missionStatus === 'loading' ? missionView.missionLoading
-    : missionStatus === 'error' ? missionView.missionError
-    : mission ? missionView.missionReady(launchSite.name, landingSite.name)
+    : skyStatus === 'ready' && windows.length === 0 ? missionView.noWindows(PERIOD_DAYS)
     : ''
+  const launchNotice =
+    missionStatus === 'loading' ? missionView.missionLoading
+    : missionStatus === 'error' ? missionView.missionError
+    : mission ? missionView.missionReady
+    : ''
+  const notice = openStep === 1 ? windowNotice : openStep === LAUNCH_STEP ? launchNotice : ''
 
-  /* Por ter ou não lançado à Lua, e não por país: é o que a lista afirma sobre cada base. O
-     Object.groupBy guarda a ordem em que cada grupo aparece: quem decide a ordem é o
-     launchSites.js. */
-  const groups = Object.entries(
-    Object.groupBy(launchSites, (site) => (site.lunarLaunch ? missionView.groupLaunched : missionView.groupNotYet)),
+  /* Escolher fecha o passo que estava reaberto: o painel segue para o próximo que falta. */
+  const chooseLandingSite = (site) => {
+    setChosenStep(null)
+    onLandingSiteChange(site)
+  }
+  const chooseLaunchSite = (id) => {
+    setChosenStep(null)
+    onLaunchSiteChange(id)
+  }
+  /* Para onde a câmera está virada, para os testes e para quem depura: o polo sul da Lua, a
+     Terra ou a nave. A câmera é do WebGL; o que a tela sabe dela é isto. */
+  const cameraName = cameraView === 'moon' ? 'pole' : cameraView
+  // o mapa do trajeto inteiro, e a nave e a Lua nele, no instante do relógio
+  const map = useMemo(() => (flying ? missionMap(mission, orbit) : null), [flying, mission, orbit])
+  const craftOnMap = craft && mapPoint(craft.center === 'moon' ? craft.positionKm.map((value, k) => value + state.moonKm[k]) : craft.positionKm)
+
+  // o relógio chegou ao pouso: a missão terminou, e o resumo dela aparece
+  const complete = flying && clock.hour >= TRACK_STEPS
+  // voando: os pedaços do trilho, a nave em números e quanto de cada trecho da linha já foi voado
+  const layout = useMemo(() => (mission ? trackLayout(mission.segments) : null), [mission])
+  const telemetry = useMemo(() => (flying ? telemetryAt(mission.segments, dateMs) : null), [flying, mission, dateMs])
+  const flown = useMemo(
+    () => (flying ? Object.fromEntries(mission.segments.map((segment) => [segment.phase, flownPoints(segment, dateMs)])) : null),
+    [flying, mission, dateMs],
   )
+  const elapsedHours = mission ? (dateMs - missionStartMs) / HOUR_MS : 0
+  /* Lançar: a vista passa de planejar para voar, o relógio volta ao lançamento e toca, e a câmera
+     vai para a nave. É a pessoa que aperta: a vista não se mexe sozinha (README, "Accessibility"). */
+  const launch = () => {
+    setFlightKey(missionStartMs)
+    clock.seek(0)
+    clock.setPlaying(true)
+    setCameraView('craft')
+    // cada lançamento começa com a câmera se pondo sozinha
+    setFreeCamera(false)
+    setLaunchCount((count) => count + 1)
+  }
+  // de volta a planejar: a missão continua montada, e a pessoa troca o que quiser
+  const changeMission = () => {
+    setFlightKey(null)
+    clock.seek(0)
+    setCameraView('earth')
+  }
+
+  /* O foco não se perde quando a tela muda de etapa: planejando vai para a pergunta do passo
+     aberto, e voando, para o botão de tocar e pausar. Só um dos dois está na página de cada vez. */
+  useKeepFocus(focusTarget, `${flying} ${openStep} ${launchCount}`)
 
   return (
     <div className="system-view mission-view">
-      <div className="system-view__scene" role="img" aria-label={mission ? missionView.labelWithMission : missionView.label}>
-        <Canvas frameloop="demand" gl={{ antialias: true }} camera={camera}>
-          <MissionBodies
-            state={state}
-            orbit={orbit}
-            sites={launchSites}
-            markers={markers}
-            selectedIndex={selectedIndex}
-            faceSelected={faceSelected}
-            onPick={(index) => {
-              setFaceSelected(false)
-              onLaunchSiteChange(launchSites[index].id)
-            }}
-            dateUtc={dateUtc}
-            reducedMotion={reducedMotion}
-            cameraView={cameraView}
-            labels={labels}
-            path={path}
-            craft={craft}
-            missionKey={missionStartMs}
-          />
-        </Canvas>
-        <div className="system-view__labels" ref={labels} />
-      </div>
-      <ViewClock
-        clock={clock}
-        startUtc={new Date(clockStartMs)}
-        periodHours={clockHours}
-        stepHours={mission ? MISSION_STEP_HOURS : 1}
-        labels={mission ? { ...missionView, timeLabel: missionView.missionTimeLabel } : missionView}
-      >
-        <div className="mission-view__camera" role="group" aria-label={missionView.cameraLabel}>
-          {Object.keys(CAMERA_VIEWS).filter((name) => name !== 'craft' || mission).map((name) => (
-            <button
-              key={name}
-              className="view-clock__button"
-              type="button"
-              aria-pressed={cameraView === name}
-              onClick={() => setCameraView(name)}
-            >
-              {missionView.camera[name]}
-            </button>
-          ))}
+      {/* A cena ocupa a largura toda, e o que se usa para montar e voar a missão fica por cima
+          dela. Os controles são irmãos da cena, e não filhos: a cena é uma imagem para o leitor de
+          tela (role="img"), e o que fica dentro de uma imagem não é lido. */}
+      <div className="mission-view__stage">
+        {/* A área da cena: a cena e o que fica por cima dela e se prende às bordas dela. O selo e o
+            resumo ficam fora, porque em tela de celular descem para baixo da cena. */}
+        <div className="mission-view__scene-area">
+          <div className="system-view__scene" role="img" aria-label={mission ? missionView.labelWithMission : missionView.label} data-camera={cameraName}>
+            <Canvas frameloop="demand" gl={{ antialias: true }} camera={camera}>
+              <MissionBodies
+                state={state}
+                orbit={orbit}
+                sites={launchSites}
+                markers={markers}
+                selectedIndex={selectedIndex}
+                faceSelected={faceSelected}
+                onPick={(index) => {
+                  setFaceSelected(false)
+                  chooseLaunchSite(launchSites[index].id)
+                }}
+                landingSite={landingSite}
+                onPickLanding={chooseLandingSite}
+                dateUtc={dateUtc}
+                reducedMotion={reducedMotion}
+                cameraView={cameraView}
+                labels={labels}
+                path={path}
+                // planejando, a linha é uma prévia: a nave e os nomes dos eventos só aparecem voando
+                craft={flying ? craft : null}
+                upcoming={flying ? nextEvent(path.events, dateMs) : null}
+                knownSites={sites}
+                step={flying ? null : openStep}
+                flown={flown}
+                missionKey={missionStartMs}
+                launchKey={launchCount}
+                craftTick={Math.round(clock.hour)}
+                freeCamera={freeCamera}
+              />
+            </Canvas>
+            <div className="system-view__labels" ref={labels} />
+          </div>
+          {flying ? (
+            <div className="mission-view__flight">
+              <button className="view-clock__button" type="button" onClick={changeMission}>
+                {missionView.changeMission}
+              </button>
+              <MissionTelemetry telemetry={telemetry} elapsedHours={elapsedHours} />
+              {/* O que o leitor de tela ouve durante o voo: a troca de fase e o pouso. O cartão de voo
+                  não serve para isso: os números dele mudam a cada quadro. Fora da vista, porque na
+                  tela o cartão já diz a fase. */}
+              <p className="mission-view__announcer" role="status">
+                {complete ? missionView.completeTitle : missionView.phaseNames[craft.phase]}
+              </p>
+            </div>
+          ) : (
+            <MissionControl
+              sites={sites}
+              landingSite={landingSite}
+              onLandingSiteChange={chooseLandingSite}
+              windows={windows}
+              landingWindow={landingWindow}
+              onLandingWindowChange={(startMs) => {
+                setChosenStep(null)
+                onLandingWindowChange(startMs)
+              }}
+              launchSites={launchSites}
+              launchSite={launchSite}
+              onLaunchSiteChange={(id) => {
+                setFaceSelected(true)
+                chooseLaunchSite(id)
+              }}
+              openStep={openStep}
+              onOpenStep={setChosenStep}
+              notice={notice}
+              canLaunch={Boolean(mission)}
+              onLaunch={launch}
+              focusTarget={focusTarget}
+            />
+          )}
+          {/* O trajeto inteiro, em escala, num canto: na cena, com a câmera na nave, ele não cabe. */}
+          {flying && <MissionMap map={map} craft={craftOnMap} moon={mapPoint(state.moonKm)} dateMs={dateMs} />}
         </div>
-      </ViewClock>
-      {/* Dois <select> comuns, como a lista de locais de pouso (SiteList.jsx): já funcionam com
-          teclado e com leitor de tela. Na das bases, a primeira opção é um aviso, e não uma base. */}
-      <div className="mission-view__choices">
-        <label className="mission-view__site">
-          {missionView.launchSiteLabel}
-          <select
-            className="mission-view__select"
-            value={launchSiteId ?? ''}
-            onChange={(event) => {
-              /* As bases estão na Terra: com a câmera na Lua, a escolha não mostraria nada. De
-                 longe a câmera fica onde está, só vira. */
-              if (cameraView === 'moon') setCameraView('earth')
-              setFaceSelected(true)
-              onLaunchSiteChange(event.target.value)
-            }}
-          >
-            <option value="" disabled>
-              {missionView.launchSitePlaceholder}
-            </option>
-            {groups.map(([groupLabel, groupSites]) => (
-              <optgroup key={groupLabel} label={groupLabel}>
-                {groupSites.map((site) => (
-                  <option key={site.id} value={site.id}>
-                    {site.name}
-                  </option>
-                ))}
-              </optgroup>
-            ))}
-          </select>
-        </label>
-        {/* As janelas de pouso do local escolhido na Lua. Só aparece quando há alguma: sem local, ou
-            sem janela, quem explica é o aviso logo abaixo. */}
-        {landingWindow && (
-          <label className="mission-view__site mission-view__site--wide">
-            {missionView.landingWindowLabel}
-            <select
-              className="mission-view__select"
-              value={landingWindow.startUtc.getTime()}
-              onChange={(event) => onLandingWindowChange(Number(event.target.value))}
-            >
-              {windows.map((item) => (
-                <option key={item.startUtc.getTime()} value={item.startUtc.getTime()}>
-                  {missionView.landingWindowValue(
-                    formatUtc(item.startUtc),
-                    formatUtc(item.endUtc),
-                    // o "≥" na janela cortada pelo período, como no painel: ela dura mais que a parte dentro dele
-                    `${item.startsBeforePeriod || item.endsAfterPeriod ? '≥ ' : ''}${formatDuration(item.durationHours)}`,
-                  )}
-                </option>
-              ))}
-            </select>
-          </label>
+        {/* O resumo do pouso, por cima da cena, no canto onde ficava o cartão do lançamento. */}
+        {complete && <MissionComplete mission={mission} onRelaunch={launch} />}
+        {/* À mão sempre que há missão: uma linha com cara de precisa convida a ler "foi assim que
+            a IM-2 voou" (plano, "Risks"). O texto abre no clique, para não ficar em cima da cena. */}
+        {mission && (
+          <details className="mission-view__badge">
+            <summary className="mission-view__badge-summary">{missionView.referenceBadge}</summary>
+            <p className="mission-view__badge-text">{missionView.referenceNote}</p>
+          </details>
         )}
       </div>
-      {/* Sempre na página, mesmo vazio: é o que faz o leitor de tela anunciar "calculando" e o
-          resultado quando o texto muda. */}
-      <p className="system-view__note mission-view__notice" role="status">{notice}</p>
-      {mission && (
-        <dl className="system-view__facts">
-          <div>
-            <dt>{missionView.craftNow}</dt>
-            <dd>{missionView.phases[craft.phase]}</dd>
-          </div>
-          <div>
-            <dt>{missionView.launch}</dt>
-            <dd>{missionView.launchValue(formatUtc(mission.launchUtc), mission.launchAzimuthDeg)}</dd>
-          </div>
-          <div>
-            <dt>{missionView.parkingOrbit}</dt>
-            <dd>{missionView.parkingOrbitValue(MISSION.parkingAltitudeKm, mission.parkingInclinationDeg)}</dd>
-          </div>
-          <div>
-            <dt>{missionView.tli}</dt>
-            <dd>{missionView.burnValue(formatUtc(mission.tliUtc), mission.tliDeltaVKmS)}</dd>
-          </div>
-          <div>
-            <dt>{missionView.crossing}</dt>
-            <dd>{formatDuration(mission.crossingHours)}</dd>
-          </div>
-          <div>
-            <dt>{missionView.loi}</dt>
-            <dd>{missionView.burnValue(formatUtc(mission.loiUtc), mission.loiDeltaVKmS)}</dd>
-          </div>
-          <div>
-            <dt>{missionView.lunarOrbit}</dt>
-            <dd>
-              {missionView.lunarOrbitValue(MISSION.lunarOrbitAltitudeKm, mission.lunarInclinationDeg, formatDuration(mission.lunarOrbitHours))}
-            </dd>
-          </div>
-          <div>
-            <dt>{missionView.descent}</dt>
-            <dd>{missionView.smallBurnValue(formatUtc(mission.descentUtc), mission.descentDeltaVKmS)}</dd>
-          </div>
-          <div>
-            <dt>{missionView.landing}</dt>
-            <dd>{formatUtc(mission.landingUtc)}</dd>
-          </div>
-        </dl>
+
+      {/* Voando: o trilho da missão. Planejando não há relógio: parado no lançamento, ele não teria
+          o que mostrar. */}
+      {flying && (
+        <MissionTrack
+          layout={layout}
+          position={trackPosition}
+          phase={craft.phase}
+          elapsedHours={elapsedHours}
+          playing={clock.playing}
+          onTogglePlay={() => clock.setPlaying((value) => !value)}
+          fast={fast}
+          onToggleFast={() => setFast((value) => !value)}
+          onSeek={(position) => clock.seek(position * TRACK_STEPS)}
+          freeCamera={freeCamera}
+          onToggleFreeCamera={() => setFreeCamera((value) => !value)}
+          focusTarget={focusTarget}
+        />
       )}
-      <dl className="system-view__facts">
-        <div>
-          <dt>{missionView.distance}</dt>
-          <dd>{missionView.distanceValue(state.distanceKm, earthRadii)}</dd>
-        </div>
-        {launchSite && (
-          <>
+
+      {/* Os números e as notas, recolhidos: abertos, eram um muro de texto embaixo da cena. */}
+      <details className="mission-view__details">
+        <summary className="mission-view__details-summary">{missionView.detailsSummary}</summary>
+        {mission && (
+          <dl className="system-view__facts">
             <div>
-              <dt>{missionView.coordinates}</dt>
-              <dd>{missionView.coordinatesValue(launchSite)}</dd>
+              <dt>{missionView.craftNow}</dt>
+              <dd>{missionView.phases[craft.phase]}</dd>
             </div>
             <div>
-              <dt>{missionView.lunarLaunch}</dt>
+              <dt>{missionView.launch}</dt>
+              <dd>{missionView.launchValue(formatUtc(mission.launchUtc), mission.launchAzimuthDeg)}</dd>
+            </div>
+            <div>
+              <dt>{missionView.parkingOrbit}</dt>
+              <dd>{missionView.parkingOrbitValue(MISSION.parkingAltitudeKm, mission.parkingInclinationDeg)}</dd>
+            </div>
+            <div>
+              <dt>{missionView.tli}</dt>
+              <dd>{missionView.burnValue(formatUtc(mission.tliUtc), mission.tliDeltaVKmS)}</dd>
+            </div>
+            <div>
+              <dt>{missionView.crossing}</dt>
+              <dd>{formatDuration(mission.crossingHours)}</dd>
+            </div>
+            <div>
+              <dt>{missionView.loi}</dt>
+              <dd>{missionView.burnValue(formatUtc(mission.loiUtc), mission.loiDeltaVKmS)}</dd>
+            </div>
+            <div>
+              <dt>{missionView.lunarOrbit}</dt>
               <dd>
-                {launchSite.lunarLaunch
-                  ? missionView.lunarLaunchValue(launchSite.lunarLaunch.mission, formatUtcDate(launchSite.lunarLaunch.launchedAtUtc))
-                  : missionView.noLunarLaunch}
+                {missionView.lunarOrbitValue(MISSION.lunarOrbitAltitudeKm, mission.lunarInclinationDeg, formatDuration(mission.lunarOrbitHours))}
               </dd>
             </div>
+            <div>
+              <dt>{missionView.descent}</dt>
+              <dd>{missionView.smallBurnValue(formatUtc(mission.descentUtc), mission.descentDeltaVKmS)}</dd>
+            </div>
+            <div>
+              <dt>{missionView.landing}</dt>
+              <dd>{formatUtc(mission.landingUtc)}</dd>
+            </div>
+          </dl>
+        )}
+        <dl className="system-view__facts">
+          <div>
+            <dt>{missionView.distance}</dt>
+            <dd>{missionView.distanceValue(state.distanceKm, earthRadii)}</dd>
+          </div>
+          {landingSite && (
+            <div>
+              <dt>{missionView.landingSiteLabel}</dt>
+              <dd>{missionView.coordinatesValue(landingSite)}</dd>
+            </div>
+          )}
+          {launchSite && (
+            <>
+              <div>
+                <dt>{missionView.coordinates}</dt>
+                <dd>{missionView.coordinatesValue(launchSite)}</dd>
+              </div>
+              <div>
+                <dt>{missionView.lunarLaunch}</dt>
+                <dd>
+                  {launchSite.lunarLaunch
+                    ? missionView.lunarLaunchValue(launchSite.lunarLaunch.mission, formatUtcDate(launchSite.lunarLaunch.launchedAtUtc))
+                    : missionView.noLunarLaunch}
+                </dd>
+              </div>
+            </>
+          )}
+        </dl>
+        {mission && (
+          <>
+            <p className="system-view__note">{missionView.pathNote}</p>
+            <p className="system-view__note">{missionView.leftOutNote}</p>
+            <p className="system-view__note">{missionView.choicesNote(MISSION)}</p>
           </>
         )}
-      </dl>
-      {!launchSite && <p className="system-view__note">{missionView.noLaunchSite}</p>}
-      {mission && (
-        <>
-          <p className="system-view__note">{missionView.referenceNote}</p>
-          <p className="system-view__note">{missionView.pathNote}</p>
-          <p className="system-view__note">{missionView.leftOutNote}</p>
-          <p className="system-view__note">{missionView.choicesNote(MISSION)}</p>
-        </>
-      )}
-      <p className="system-view__note">{missionView.scaleNote(earthRadii)}</p>
-      <p className="system-view__note">{missionView.sitesNote(EARTH_SIDEREAL_DAY_HOURS)}</p>
+        <p className="system-view__note">{missionView.scaleNote(earthRadii)}</p>
+        <p className="system-view__note">{missionView.sitesNote(EARTH_SIDEREAL_DAY_HOURS)}</p>
+      </details>
     </div>
   )
 }

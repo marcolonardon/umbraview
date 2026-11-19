@@ -10,20 +10,12 @@ export const missionView = {
     '3D view of the Earth and the Moon on the chosen date, with their real sizes and the real distance between them, over the real star field. Launch sites are marked on the Earth: click a mark to choose that site, or use the list below. Drag to rotate, scroll to zoom.',
   earth: 'Earth',
   moon: 'Moon',
-  // O relógio próprio da vista: anda pelo período sem mudar a data do cálculo.
-  timeLabel: 'Time in the period',
   play: 'Play',
   pause: 'Pause',
-  // Para onde a câmera vai: em escala, a Terra vira um ponto quando a órbita inteira cabe na tela.
-  cameraLabel: 'Camera',
-  camera: { earth: 'Earth', moon: 'Moon', orbit: 'Whole orbit', craft: 'Spacecraft' },
   // A lista de bases, que é por onde quem usa teclado escolhe uma.
-  launchSiteLabel: 'Launch site',
   launchSitePlaceholder: 'Choose a launch site…',
   groupLaunched: 'Has launched to the Moon',
   groupNotYet: 'No launch to the Moon so far',
-  // os dois jeitos de escolher: o clique na marca e a lista, que também vira a câmera para a base
-  noLaunchSite: 'Choose a launch site: click its mark on the Earth, or pick it in the list, and the camera turns to it.',
   distance: 'Earth–Moon distance',
   distanceValue: (km, earthRadii) => `${Math.round(km).toLocaleString('en-US')} km (${earthRadii.toFixed(1)} Earth radii)`,
   // as 4 casas são as da fonte (GCAT): uns 11 m no chão
@@ -48,23 +40,84 @@ export const missionView = {
   // o nome da cena quando a missão está desenhada
   labelWithMission:
     '3D view of the Earth and the Moon, with their real sizes and the real distance between them, over the real star field. A line shows the path of the reference mission, from the launch site, around the Earth, across to the Moon, around it and down to the landing site; a dot is the spacecraft at the time of the clock. The numbers of the mission are in the list below. Drag to rotate, scroll to zoom.',
-  // a janela de pouso, entre as do local escolhido na Lua
-  landingWindowLabel: 'Landing window',
-  landingWindowValue: (start, end, duration) => `${start} to ${end} (${duration})`,
-  // o relógio, quando cobre a missão: do lançamento ao pouso
-  missionTimeLabel: 'Time in the mission',
+  // o cartão de uma janela de pouso: a duração vai em destaque, e as duas datas embaixo
+  windowRange: (start, end) => `${start} to ${end}`,
   // o que falta para haver uma missão, um texto por estado
-  noLandingSite:
-    'To simulate a mission, choose a landing site on the Moon: in the list of the panel, or by clicking the Moon in the Moon view.',
   windowsLoading: 'Calculating the landing windows of the landing site…',
   windowsError: 'The landing windows of this landing site could not be calculated, so there is no mission to simulate.',
-  noWindows:
-    'This landing site has no landing window in the period, so there is no mission to simulate. Try another date or another site.',
+  // a data não se troca nesta vista: o caminho é outro local
+  noWindows: (periodDays) => `No landing window here in the next ${periodDays} days. Choose another landing site.`,
   missionLoading: 'Calculating the mission…',
   missionError: 'No path was found from this launch site to this landing window.',
-  missionReady: (launchSite, landingSite) => `Reference mission from ${launchSite} to ${landingSite}.`,
-  // os nomes na cena: a nave e os quatro eventos
-  spacecraft: 'Spacecraft',
+  missionReady: 'Ready to launch.',
+
+  /* O painel da missão (card C17): os três passos para montar uma missão, o botão de lançar, a
+     linha do tempo das fases e o resumo no pouso. */
+  controlTitle: 'Mission control',
+  // as etiquetas dos três passos: o nome curto, e o que a da janela mostra depois de escolhida
+  chipLanding: 'Landing',
+  chipWindow: 'Window',
+  chipLaunch: 'Launch site',
+  windowChip: (date, duration) => `${date} · ${duration}`,
+  // passo 1: onde pousar
+  stepLanding: 'Where to land?',
+  landingSiteLabel: 'Landing site',
+  landingSitePlaceholder: 'Choose a landing site…',
+  // o ponto que veio do clique na Lua, e não da lista: a opção que a lista mostra para ele
+  customLandingSite: 'Your point on the Moon',
+  landingHint: 'Click a pin, or any point on the Moon.',
+  // as listas ficam recolhidas atrás deste nome: é por elas que quem usa teclado escolhe
+  chooseFromList: 'Choose from a list',
+  // passo 2: quando pousar
+  stepWindow: 'When to land?',
+  windowWaiting: 'Choose where to land first.',
+  // passo 3: de onde lançar
+  stepLaunch: 'Where to launch from?',
+  launchHint: 'Click a mark on the Earth.',
+  // o botão que solta a missão: põe a câmera na nave e toca o relógio, do lançamento
+  launchButton: 'Launch',
+  launchAgain: 'Launch again',
+  // voando, o painel some; este botão volta a ele
+  changeMission: 'Change mission',
+  // o selo por cima da cena, que abre a nota de que é uma missão de referência
+  referenceBadge: 'Reference mission',
+  // o trilho do painel de voo: um controle só para o tempo, da Terra à Lua
+  progressLabel: 'Mission progress',
+  // o que o leitor de tela ouve no trilho: a fase e o tempo de missão
+  progressValue: (phase, elapsed) => `${phase}, T+ ${elapsed}`,
+  // a velocidade rápida de tocar
+  fastLabel: '4× speed',
+  // voando, a câmera se põe sozinha; este botão a solta, para a pessoa girar e aproximar
+  freeCamera: 'Free camera',
+  // o mapa pequeno do trajeto inteiro, no canto da cena
+  mapLabel:
+    'Map of the whole path of the mission, seen from above: the Earth, the orbit of the Moon, the Moon, the crossing and the spacecraft.',
+  mapCaption: 'Whole path, to scale. The Moon and the spacecraft are dots.',
+  // a legenda do trilho: os nomes das fases, embaixo dele
+  timelineLabel: 'Mission phases',
+  // o cartão de voo: a fase, o tempo de missão e a nave em números
+  flightStatus: 'Flight status',
+  elapsedValue: (elapsed) => `T+ ${elapsed}`,
+  telemetryValue: (altitudeKm, body, speedKmS) =>
+    `${Math.round(altitudeKm).toLocaleString('en-US')} km above the ${body === 'moon' ? 'Moon' : 'Earth'} · ${speedKmS.toFixed(2)} km/s`,
+  // nos dois trechos desenhados não há número: os pontos do caminho são desenho
+  drawnValue: 'Drawn, not computed',
+  phaseNames: {
+    ascent: 'Climb',
+    parking: 'Parking orbit',
+    crossing: 'Crossing',
+    lunarOrbit: 'Lunar orbit',
+    descent: 'Descent',
+    landing: 'Landing',
+  },
+  // o resumo, quando o relógio chega ao pouso: só números que o motor calculou
+  completeTitle: 'Mission complete',
+  totalTime: 'From launch to landing',
+  totalDeltaV: 'Speed changed by the three burns',
+  totalDeltaVValue: (kmS) => `${kmS.toFixed(2)} km/s`,
+  // os números e as notas ficam recolhidos, para a tela não virar um muro de texto
+  detailsSummary: 'Mission details and what is real',
+  // os nomes dos quatro eventos na cena; voando, só o do próximo aparece
   events: { launch: 'Launch', tli: 'Leaving the Earth', loi: 'Arriving at the Moon', landing: 'Landing' },
   // os números da missão, na ordem do voo
   craftNow: 'The spacecraft now',

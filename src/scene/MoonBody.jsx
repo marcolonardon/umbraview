@@ -12,16 +12,22 @@ const moonColorImage = () => moonImagesOfPage().then((images) => images.color)
 const AXIS_REACH = 1.7
 
 /* radius: o raio da Lua na cena. matrix: a orientação e a posição dela no instante, um Matrix4 (o
-   moonMatrix do src/engine/system.js, com a posição posta pela vista, na escala dela). */
-export function MoonBody({ radius, matrix }) {
+   moonMatrix do src/engine/system.js, com a posição posta pela vista, na escala dela).
+   onClick, onPointerOver e onPointerOut: para a vista em que a Lua é clicável (a da missão, que
+   escolhe nela o local de pouso, card C17); sem eles, a Lua não ouve o mouse.
+   showAxis: se a linha do eixo é desenhada; a vista da missão a esconde no passo do pouso, onde
+   ela atravessaria os pinos do polo, e durante o voo. */
+export function MoonBody({ radius, matrix, onClick, onPointerOver, onPointerOut, showAxis = true }) {
   const texture = useBodyTexture(moonColorImage)
   return (
     <group matrix={matrix} matrixAutoUpdate={false}>
-      <mesh>
+      <mesh onClick={onClick} onPointerOver={onPointerOver} onPointerOut={onPointerOut}>
         <sphereGeometry args={[radius, 48, 24]} />
         <meshStandardMaterial key={texture ? 'textured' : 'plain'} color={texture ? '#ffffff' : token('--color-moon')} map={texture} />
       </mesh>
-      <Line points={[[0, -radius * AXIS_REACH, 0], [0, radius * AXIS_REACH, 0]]} color={token('--color-text-muted')} lineWidth={1} />
+      {showAxis && (
+        <Line points={[[0, -radius * AXIS_REACH, 0], [0, radius * AXIS_REACH, 0]]} color={token('--color-text-muted')} lineWidth={1} />
+      )}
     </group>
   )
 }

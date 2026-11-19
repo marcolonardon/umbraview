@@ -75,6 +75,27 @@ describe('useViewClock', () => {
     expect(result.current.hour).toBe(0)
   })
 
+  /* A missão tem começo e fim (card C17): tocando, o relógio para no pouso, em vez de voltar ao
+     lançamento, para o resumo da missão ficar na tela. */
+  it('com uma hora de parada (stopAtHour), tocando ele para nela, em vez de dar a volta', () => {
+    const { result } = renderHook(() => useViewClock(112, HORAS_POR_SEGUNDO, 'missao', 110))
+    act(() => result.current.seek(100))
+    act(() => result.current.setPlaying(true))
+    act(() => vi.advanceTimersByTime(2000))
+    expect(result.current.hour).toBe(110)
+    expect(result.current.playing).toBe(false)
+  })
+
+  it('tocar de novo depois de parar no fim recomeça do zero', () => {
+    const { result } = renderHook(() => useViewClock(112, HORAS_POR_SEGUNDO, 'missao', 110))
+    act(() => result.current.seek(110))
+    act(() => result.current.setPlaying(true))
+    act(() => vi.advanceTimersByTime(1000))
+    expect(result.current.playing).toBe(true)
+    expect(result.current.hour).toBeGreaterThan(29)
+    expect(result.current.hour).toBeLessThanOrEqual(30)
+  })
+
   it('com a mesma resetKey, redesenhar a vista não mexe no relógio', () => {
     const { result, rerender } = renderHook(({ chave }) => useViewClock(PERIODO_H, HORAS_POR_SEGUNDO, chave), {
       initialProps: { chave: 'periodo' },
