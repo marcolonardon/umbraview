@@ -141,3 +141,25 @@ describe('as bases e as linhas do GCAT', () => {
     expect(names(wrong)).toEqual([])
   })
 })
+
+/* Card C19: a faixa de direções que cada base permite. Sem fonte conferida, ela é null, e a tela
+   diz que não foi conferida: a gente não inventa regra. Com fonte, cada faixa vai de 0° a 360°, do
+   norte para o leste, com o mínimo antes do máximo, e o link da fonte. */
+describe('as direções de lançamento de cada base (card C19)', () => {
+  it('toda base diz a faixa (azimuthLimits), mesmo que seja null', () => {
+    expect(names(launchSites.filter((site) => !('azimuthLimits' in site)))).toEqual([])
+  })
+
+  it('cada faixa conferida fica entre 0° e 360°, com o mínimo antes do máximo e a fonte num https://', () => {
+    const wrong = launchSites
+      .filter((site) => site.azimuthLimits)
+      .filter((site) =>
+        site.azimuthLimits.length === 0 ||
+        site.azimuthLimits.some(
+          ({ minDeg, maxDeg, sourceUrl }) =>
+            !(minDeg >= 0 && maxDeg <= 360 && minDeg < maxDeg) || !String(sourceUrl).startsWith('https://'),
+        ),
+      )
+    expect(names(wrong)).toEqual([])
+  })
+})

@@ -15,7 +15,11 @@
  * gcat: o código da base e o da plataforma no GCAT; é por eles que o teste acha a linha.
  * lunarLaunch é null em Alcântara: é isso que separa os dois grupos da lista
  * (src/scene/MissionView.jsx). Conferido no registro do GCAT em 18/11/2026: os 104 lançamentos de
- * lá são testes, foguetes de sondagem e 4 tentativas de órbita baixa. */
+ * lá são testes, foguetes de sondagem e 4 tentativas de órbita baixa.
+ *
+ * azimuthLimits (card C19): as faixas de direção em que a base lança, [{ minDeg, maxDeg, sourceUrl }],
+ * em graus do norte para o leste, cada uma com a fonte. Em todas está null: ainda não achamos a fonte
+ * de nenhuma. Com null a missão sai como antes, e a tela diz que a direção não foi conferida. */
 const GCAT_URL = 'https://planet4589.org/space/gcat/index.html'
 
 export const launchSites = [
@@ -28,6 +32,7 @@ export const launchSites = [
     // o pouso do IM-2 é um dos locais da lista de pouso (src/data/sites.js)
     lunarLaunch: { mission: 'IM-2', launchedAtUtc: new Date('2025-02-27T00:16:30Z'), gcatTag: '2025-038', sourceUrl: GCAT_URL },
     sourceUrl: GCAT_URL,
+    azimuthLimits: null,
   },
   {
     id: 'ksc-lc39b',
@@ -37,6 +42,7 @@ export const launchSites = [
     gcat: { site: 'KSC', pad: 'LC39B' },
     lunarLaunch: { mission: 'Artemis II', launchedAtUtc: new Date('2026-04-01T22:35:12Z'), gcatTag: '2026-069', sourceUrl: GCAT_URL },
     sourceUrl: GCAT_URL,
+    azimuthLimits: null,
   },
   {
     id: 'cape-canaveral-slc41',
@@ -46,6 +52,7 @@ export const launchSites = [
     gcat: { site: 'CC', pad: 'SLC41' },
     lunarLaunch: { mission: 'Peregrine', launchedAtUtc: new Date('2024-01-08T07:18:00Z'), gcatTag: '2024-006', sourceUrl: GCAT_URL },
     sourceUrl: GCAT_URL,
+    azimuthLimits: null,
   },
   {
     id: 'wallops-pad0b',
@@ -55,6 +62,7 @@ export const launchSites = [
     gcat: { site: 'MARS', pad: 'Pad 0B' },
     lunarLaunch: { mission: 'LADEE', launchedAtUtc: new Date('2013-09-07T03:27:00Z'), gcatTag: '2013-047', sourceUrl: GCAT_URL },
     sourceUrl: GCAT_URL,
+    azimuthLimits: null,
   },
   {
     id: 'vandenberg-slc4w',
@@ -71,6 +79,7 @@ export const launchSites = [
       sourceUrl: 'https://science.nasa.gov/mission/clementine/',
     },
     sourceUrl: GCAT_URL,
+    azimuthLimits: null,
   },
   {
     id: 'kourou-ela3',
@@ -88,6 +97,7 @@ export const launchSites = [
       sourceUrl: 'https://science.nasa.gov/mission/smart-1/',
     },
     sourceUrl: GCAT_URL,
+    azimuthLimits: null,
   },
   {
     id: 'baikonur-81-23',
@@ -97,6 +107,7 @@ export const launchSites = [
     gcat: { site: 'GIK-5', pad: 'LC81/23' },
     lunarLaunch: { mission: 'Luna-24', launchedAtUtc: new Date('1976-08-09T15:04:12Z'), gcatTag: '1976-081', sourceUrl: GCAT_URL },
     sourceUrl: GCAT_URL,
+    azimuthLimits: null,
   },
   {
     id: 'vostochny-1s',
@@ -106,6 +117,7 @@ export const launchSites = [
     gcat: { site: 'VOST', pad: 'PU1S' },
     lunarLaunch: { mission: 'Luna-25', launchedAtUtc: new Date('2023-08-10T23:10:57Z'), gcatTag: '2023-118', sourceUrl: GCAT_URL },
     sourceUrl: GCAT_URL,
+    azimuthLimits: null,
   },
   {
     id: 'xichang-lc2',
@@ -115,6 +127,7 @@ export const launchSites = [
     gcat: { site: 'XSC', pad: 'LC2' },
     lunarLaunch: { mission: "Chang'e-4", launchedAtUtc: new Date('2018-12-07T18:23:00Z'), gcatTag: '2018-103', sourceUrl: GCAT_URL },
     sourceUrl: GCAT_URL,
+    azimuthLimits: null,
   },
   {
     id: 'wenchang-lc101',
@@ -124,6 +137,7 @@ export const launchSites = [
     gcat: { site: 'WEN', pad: 'LC101' },
     lunarLaunch: { mission: "Chang'e-6", launchedAtUtc: new Date('2024-05-03T09:27:29Z'), gcatTag: '2024-083', sourceUrl: GCAT_URL },
     sourceUrl: GCAT_URL,
+    azimuthLimits: null,
   },
   {
     id: 'sriharikota-slp',
@@ -133,6 +147,7 @@ export const launchSites = [
     gcat: { site: 'SHAR', pad: 'SLP' },
     lunarLaunch: { mission: 'Chandrayaan-3', launchedAtUtc: new Date('2023-07-14T09:05:17Z'), gcatTag: '2023-098', sourceUrl: GCAT_URL },
     sourceUrl: GCAT_URL,
+    azimuthLimits: null,
   },
   {
     id: 'tanegashima-yoshinobu',
@@ -142,6 +157,7 @@ export const launchSites = [
     gcat: { site: 'TNSC', pad: 'Y' },
     lunarLaunch: { mission: 'SLIM', launchedAtUtc: new Date('2023-09-06T23:42:11Z'), gcatTag: '2023-137', sourceUrl: GCAT_URL },
     sourceUrl: GCAT_URL,
+    azimuthLimits: null,
   },
   {
     id: 'kagoshima-mu',
@@ -152,6 +168,7 @@ export const launchSites = [
     gcat: { site: 'KASC', pad: 'M1' },
     lunarLaunch: { mission: 'Hiten', launchedAtUtc: new Date('1990-01-24T11:46:00Z'), gcatTag: '1990-007', sourceUrl: GCAT_URL },
     sourceUrl: GCAT_URL,
+    azimuthLimits: null,
   },
   {
     id: 'mahia-lc1b',
@@ -161,6 +178,7 @@ export const launchSites = [
     gcat: { site: 'MAHIA', pad: 'LC1B' },
     lunarLaunch: { mission: 'CAPSTONE', launchedAtUtc: new Date('2022-06-28T09:55:00Z'), gcatTag: '2022-070', sourceUrl: GCAT_URL },
     sourceUrl: GCAT_URL,
+    azimuthLimits: null,
   },
   {
     id: 'alcantara-vls',
@@ -172,5 +190,6 @@ export const launchSites = [
     gcat: { site: 'ALCA', pad: 'VLS' },
     lunarLaunch: null,
     sourceUrl: GCAT_URL,
+    azimuthLimits: null,
   },
 ]
