@@ -1,0 +1,11 @@
+# Faixas de azimute de lancamento das bases de src/data/launchSites.js (card C19), copiadas em 19/11/2026.
+# Uma linha por base com fonte que diz a faixa em graus; as outras bases ficam com azimuthLimits: null.
+# Fontes: NASA, Wallops Range User's Handbook, 840-HDBK-0004, version 4 (efetivo de 04/2024), secao 3.1.5;
+# National Security Space Road Map (NSSA, dados de 07/11/1997, producao de 23/06/2001), paginas Eastern Range e Western Range.
+# O teste launchSites.test.js amarra a lista a estas linhas.
+#site_id	minDeg	maxDeg	source_url	quote
+ksc-lc39a	37	112	https://wslfweb.org/docs/roadmap/irm/internet/spforsup/init/html/eastrang.htm	Orbital launches from the ER are limited to azimuths between 37 and 112 degrees.
+ksc-lc39b	37	112	https://wslfweb.org/docs/roadmap/irm/internet/spforsup/init/html/eastrang.htm	Orbital launches from the ER are limited to azimuths between 37 and 112 degrees.
+cape-canaveral-slc41	37	112	https://wslfweb.org/docs/roadmap/irm/internet/spforsup/init/html/eastrang.htm	Orbital launches from the ER are limited to azimuths between 37 and 112 degrees.
+wallops-pad0b	90	160	https://www.nasa.gov/wp-content/uploads/2023/09/wallopsrangeusershandbook-2024.pdf	In general, launch azimuths between 90 degrees and 160 degrees can be accommodated depending on impact locations.
+vandenberg-slc4w	147	201	https://wslfweb.org/docs/roadmap/irm/internet/spforsup/init/html/westrang.htm	Orbital launches from WR are limited to azimuths between 147 and 201 degrees.

@@ -163,3 +163,26 @@ describe('as direções de lançamento de cada base (card C19)', () => {
     expect(names(wrong)).toEqual([])
   })
 })
+
+/* As faixas com fonte (card C19) são as das linhas copiadas em scripts/references/launch-azimuths.tsv,
+   com a frase da fonte ao lado: quem trocar um número à mão reprova aqui. A base que não está no
+   arquivo não tem fonte, e fica com null. */
+describe('as faixas de direção e as linhas copiadas das fontes (card C19)', () => {
+  const ROWS = gcatRows('launch-azimuths.tsv')
+
+  it('cada linha copiada traz os dois números na própria frase da fonte', () => {
+    const wrong = ROWS.filter((row) => !row.quote.includes(row.minDeg) || !row.quote.includes(row.maxDeg))
+    expect(wrong.map((row) => row.site_id)).toEqual([])
+  })
+
+  it('a faixa de cada base é a da linha dela, com a mesma fonte; sem linha, é null', () => {
+    const expected = Object.fromEntries(
+      launchSites.map((site) => {
+        const row = ROWS.find((item) => item.site_id === site.id)
+        return [site.id, row ? [{ minDeg: Number(row.minDeg), maxDeg: Number(row.maxDeg), sourceUrl: row.source_url }] : null]
+      }),
+    )
+    const actual = Object.fromEntries(launchSites.map((site) => [site.id, site.azimuthLimits]))
+    expect(actual).toEqual(expected)
+  })
+})

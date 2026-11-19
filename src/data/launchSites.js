@@ -18,9 +18,20 @@
  * lá são testes, foguetes de sondagem e 4 tentativas de órbita baixa.
  *
  * azimuthLimits (card C19): as faixas de direção em que a base lança, [{ minDeg, maxDeg, sourceUrl }],
- * em graus do norte para o leste, cada uma com a fonte. Em todas está null: ainda não achamos a fonte
- * de nenhuma. Com null a missão sai como antes, e a tela diz que a direção não foi conferida. */
+ * em graus do norte para o leste, cada uma com a fonte. Só cinco bases têm fonte que diz a faixa em
+ * graus (procuradas em 19/11/2026; a frase de cada fonte está em scripts/references/launch-azimuths.tsv):
+ * - o Eastern Range (Kennedy e Cabo Canaveral), de 37° a 112°, e o Western Range (Vandenberg), de 147°
+ *   a 201°: National Security Space Road Map, com dados de 1997; é o número mais recente que achamos
+ *   num documento do governo, e pode ter mudado;
+ * - Wallops, de 90° a 160°: o manual do range da NASA, de 2024.
+ * As outras ficam com null: o guia do Electron, para Mahia, dá inclinações, e não azimutes, e para as
+ * demais só achamos sites que juntam números de outros, sem fonte. Com null a missão sai como antes, e
+ * a tela diz que a direção não foi conferida. */
 const GCAT_URL = 'https://planet4589.org/space/gcat/index.html'
+// as duas páginas do National Security Space Road Map (NSSA), numa cópia pública que continua no ar
+const EASTERN_RANGE_URL = 'https://wslfweb.org/docs/roadmap/irm/internet/spforsup/init/html/eastrang.htm'
+const WESTERN_RANGE_URL = 'https://wslfweb.org/docs/roadmap/irm/internet/spforsup/init/html/westrang.htm'
+const WALLOPS_HANDBOOK_URL = 'https://www.nasa.gov/wp-content/uploads/2023/09/wallopsrangeusershandbook-2024.pdf'
 
 export const launchSites = [
   {
@@ -32,7 +43,7 @@ export const launchSites = [
     // o pouso do IM-2 é um dos locais da lista de pouso (src/data/sites.js)
     lunarLaunch: { mission: 'IM-2', launchedAtUtc: new Date('2025-02-27T00:16:30Z'), gcatTag: '2025-038', sourceUrl: GCAT_URL },
     sourceUrl: GCAT_URL,
-    azimuthLimits: null,
+    azimuthLimits: [{ minDeg: 37, maxDeg: 112, sourceUrl: EASTERN_RANGE_URL }],
   },
   {
     id: 'ksc-lc39b',
@@ -42,7 +53,7 @@ export const launchSites = [
     gcat: { site: 'KSC', pad: 'LC39B' },
     lunarLaunch: { mission: 'Artemis II', launchedAtUtc: new Date('2026-04-01T22:35:12Z'), gcatTag: '2026-069', sourceUrl: GCAT_URL },
     sourceUrl: GCAT_URL,
-    azimuthLimits: null,
+    azimuthLimits: [{ minDeg: 37, maxDeg: 112, sourceUrl: EASTERN_RANGE_URL }],
   },
   {
     id: 'cape-canaveral-slc41',
@@ -52,7 +63,7 @@ export const launchSites = [
     gcat: { site: 'CC', pad: 'SLC41' },
     lunarLaunch: { mission: 'Peregrine', launchedAtUtc: new Date('2024-01-08T07:18:00Z'), gcatTag: '2024-006', sourceUrl: GCAT_URL },
     sourceUrl: GCAT_URL,
-    azimuthLimits: null,
+    azimuthLimits: [{ minDeg: 37, maxDeg: 112, sourceUrl: EASTERN_RANGE_URL }],
   },
   {
     id: 'wallops-pad0b',
@@ -62,7 +73,7 @@ export const launchSites = [
     gcat: { site: 'MARS', pad: 'Pad 0B' },
     lunarLaunch: { mission: 'LADEE', launchedAtUtc: new Date('2013-09-07T03:27:00Z'), gcatTag: '2013-047', sourceUrl: GCAT_URL },
     sourceUrl: GCAT_URL,
-    azimuthLimits: null,
+    azimuthLimits: [{ minDeg: 90, maxDeg: 160, sourceUrl: WALLOPS_HANDBOOK_URL }],
   },
   {
     id: 'vandenberg-slc4w',
@@ -79,7 +90,7 @@ export const launchSites = [
       sourceUrl: 'https://science.nasa.gov/mission/clementine/',
     },
     sourceUrl: GCAT_URL,
-    azimuthLimits: null,
+    azimuthLimits: [{ minDeg: 147, maxDeg: 201, sourceUrl: WESTERN_RANGE_URL }],
   },
   {
     id: 'kourou-ela3',
