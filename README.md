@@ -101,6 +101,13 @@ installs everything on Windows, from scratch.
   under the scene; the keyboard focus follows the steps instead of being lost; and a screen
   reader hears each change of phase. The numbers and the notes are folded under "Mission
   details".
+- Choosing the landing window by where and when one can land (card C18): when a site has no
+  landing window in the 30 days of the date, the engine looks ahead, up to 12 periods, and the
+  window step offers the next window ("Go to the next landing window"), or says that the point is
+  on the far side, where the Earth never rises. "Show where you can land", in the landing and
+  window steps, paints on the Moon of the Mission view the same map of landing areas as the Moon
+  view. In the Moon view, with a site chosen, "Plan a mission here" opens the Mission view on the
+  window step.
 - The orbit propagator of the engine (`src/engine/orbit.js`, card C14): given a position, a speed
   and an instant, where a spacecraft is later, under the gravity of the Earth, the Moon and the
   Sun, each in its real position. Checked against the flown path of Artemis I, from JPL Horizons:

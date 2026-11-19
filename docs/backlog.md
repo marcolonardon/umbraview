@@ -74,6 +74,7 @@ returns `{ status, sky }`:
 | `sky.earthFraction` | number from 0 to 1 | Share of the period's hours with some part of the Earth in view. |
 | `sky.longestDarkHours` | number | The longest continuous stretch, in hours, with the whole Sun hidden. |
 | `sky.landingWindows` | list of `{ startUtc, endUtc, durationHours, startsBeforePeriod, endsAfterPeriod }`: two `Date`s, a number and two `true` or `false` | Stretches in which at least half of the Sun and some part of the Earth are in view at the same time. `durationHours`: how long the window lasts, in hours, without rounding: `endUtc` minus `startUtc`; for a window cut by the period, only the part inside it (added in card I6). The start and the end fall between two hours, by the same calculation as the sunset: a window that closes because of the Sun closes at `nextSunsetUtc`. `startsBeforePeriod`: the window was already open at the start of the period, and `startUtc` is the start of the period, not the sunrise. `endsAfterPeriod`: the window continues after the end of the period, and `endUtc` is the last calculated instant. A window entirely inside the period is only included if it lasts at least `MIN_LANDING_WINDOW_HOURS` (`src/engine/config.js`); one cut at either end is included even if shorter. Empty list if there are none. |
+| `sky.nextWindow` | `null`, or `{ landingWindow, periodStartUtc, searchedUntilUtc, earthEverAboveHorizon }`: a window in the format of `sky.landingWindows` (or `null`), two `Date`s (the first can be `null`) and a `true` or `false` | Only when `sky.landingWindows` is empty (card C18); otherwise `null`. The engine looks at the next `NEXT_WINDOW_PERIODS` periods (`src/engine/config.js`) one by one. `landingWindow`: the first window found, as that period gives it; `periodStartUtc`: the start of that period, the date that shows it. `searchedUntilUtc`: the end of the last period looked at. `earthEverAboveHorizon`: the Earth was above the mathematical horizon at some hour of the search; `false` is the far side, where no date gives a window. Added by `createSiteSky` (`src/engine/siteSky.js`), not by `summarizeSky`. |
 | `sky.period` | `{ startUtc, endUtc }`: two `Date`s | The period of the numbers above. `startUtc`: the chosen date, the same instant as `sunNow` and `earthNow`. `endUtc`: the last calculated instant, the date plus `PERIOD_DAYS` × 24 − 1 hours (currently 719 h), because the engine calculates hour by hour starting from the date; it is the same `endUtc` as a window with `endsAfterPeriod`. Added in card I6, by Enzo's decision on 12/11. |
 
 The engine delivers `sky` ready, in this format: `summarizeSky`, in `src/engine/summary.js`. The
@@ -2758,6 +2759,76 @@ at 1440 × 900, with the pane in view:
 - Not verified: the lag on Marco's own browser and window, which is where he saw it; a slower
   machine; the Earth, Moon and Sun view, which uses the same `MoonBody.jsx` without the relief
   (its tests pass, it was not opened after this change).
+
+### C18 · Choose the landing window by where and when one can land
+
+**Status:** built on 19/11 on the branch `feat/c18-janela-de-pouso` of Marco's fork, born from the
+branch of card C17. Waiting for Marco's check, Enzo's OK and the PR number · **Depends on:** C17
+
+**What it is for.** Marco, using the Mission view on 19/11, asked for three things: a better way to
+choose the landing window when the landing site is a point clicked at random on the Moon; to see,
+in the Mission view, where one can land; and to choose the site in the Moon view and go from there
+to the Mission view.
+
+**What was there before.** A point clicked on the Moon only had its windows searched in the 30 days
+after the date. With none, the card said "Choose another date or another landing site", and one
+tried dates in the dark. On the far side there is never a window (the rule asks for the Earth in
+view), and the screen did not say so. The map of landing areas existed only in the Moon view, and
+there was no way from the Moon view to the Mission view other than the view selector, which opened
+on the launch site step, past the windows.
+
+**As it turned out.**
+- **The engine searches ahead** (`createSiteSky`, in `src/engine/siteSky.js`). When the period has no
+  window, it looks at the next 12 periods of 30 days (`NEXT_WINDOW_PERIODS`, in
+  `src/engine/config.js`) and returns the first window found in `sky.nextWindow` (format in "What
+  the bridge delivers to the screen"). The Sun and the Earth of each period are kept for the next
+  point, up to 26 periods. Measured on 19/11 in Node, on Marco's computer: each period more takes
+  5 to 12 ms. Near the pole the window comes and goes with the seasons: at 87.5°S, 150°W there is
+  none from 14/11/2026 for six periods, and one in the seventh.
+- **The window step says what the search found.** With a window ahead: "No landing window in the 30
+  days from 19 Nov 2026. The next one opens on 29 May 2027, 19:36 UTC and lasts 3 d 3 h.", and the
+  button "Go to the next landing window", which takes the date to the start of that period and keeps
+  the step open, with the window in the cards. With the Earth never above the horizon: it says it is
+  the far side, with no direct link to the Earth. With nothing in the year: until when it searched.
+- **"Show where you can land"**, in the landing step and in the window step: the same map as the
+  Moon view (`useLandingAreas`, the points with a window in the 30 days of the date), switched on by
+  the same state of `App.jsx`, so it is on in both views or in neither. Marco chose this map (option
+  A) over one of the chosen window only. The Moon of the Mission view moves and turns, so its
+  materials read the masks by the position of the vertex on the Moon itself
+  (`bodyLandingShader`, in `src/scene/moonGlobe.js`), and not in the world, as the main scene does.
+  It is not drawn, nor computed, during the flight.
+- **The window step looks at the Moon**, from above the south pole, like the landing step: it is
+  where the chosen point and the map are. Before, the camera stayed where it was, and reopening the
+  window from the launch site step left it on the Earth.
+- **"Plan a mission here"**, in the site panel of the Moon view, with a site chosen: it opens the
+  Mission view on the window step, with the site already chosen. The view selector still opens on
+  the first step left.
+
+**Verified** on 19/11/2026, with the dev server in the app's browser pane (Chromium):
+- At 1440 × 900: Athena (IM-2) chosen in the list of the Moon view, "Plan a mission here" opened the
+  Mission view on "When to land?", with its two windows and the camera on the pole. The map on: the
+  fine grid around the pole and the coarse one outside, in green, and the line under the button.
+  Back in the Moon view the map was still on.
+- A point clicked at 65.3°S, 125.8°E: the far side notice. One at 81.3°S, 141.7°E: "No landing window
+  here until 14 Dec 2027". The point 87.5°S, 150°W (set from the browser console, for there was no
+  way to click exactly there): the notice of the window of 29 May 2027, 3 d 3 h; the button took the
+  date there, and the window card showed it, chosen.
+- At 375 × 812: the card with the window and the map fits inside the scene, and the page has no
+  side scroll.
+- The console: only the "Attempted to synchronously unmount a root" of the hot reload during
+  development.
+- Test first: the engine tests (12 periods, the far side, the kept periods), the tests of the view
+  (next window, startStep, the map, the camera of the window step), the shader test and the App
+  tests failed before the code.
+- `npm run verify` passes, with 968 tests in 68 files and no lint warning.
+- Not verified: Marco's own check; a touch screen; a real screen reader; a slower machine (the
+  search runs on the page's main thread, as the rest of `useSiteSky`); browsers other than Chromium.
+- Known and left: on a phone the card of the window step, with the map line, covers more than half
+  of the scene.
+
+**New cards suggested by this one** (not done here):
+- The site panel of the Moon view could show the next window too, when the period has none.
+- Suggest, from the map, the nearest point with a window to the point clicked.
 
 ---
 
