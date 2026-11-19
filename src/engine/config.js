@@ -43,6 +43,13 @@ export const MIN_LANDING_WINDOW_HOURS = 24
    NASA chega a 13 janelas de pouso na lista. Muda aqui, e só aqui. */
 export const PERIOD_DAYS = 30
 
+/* Quando o período da data não tem janela de pouso, quantos períodos seguintes o motor olha atrás
+   da próxima (card C18): 12 de 30 dias, quase um ano. Perto do polo a janela vem e vai com as
+   estações; num ponto a 87,5°S só apareceu no sétimo período a partir de 14/11/2026. Medido em
+   19/11/2026 no Node, no computador do Marco: cada período a mais leva de 5 a 12 ms, e a posição
+   do Sol e da Terra de cada um fica guardada para o ponto seguinte. Muda aqui, e só aqui. */
+export const NEXT_WINDOW_PERIODS = 12
+
 /* O propagador de órbitas (orbit.js, card C14). A prova é o orbit.test.js: a trajetória voada da
    Artemis I, do JPL Horizons, e as órbitas que têm fórmula. As medições abaixo são de 18/11/2026,
    no Node, no computador do Marco; mudar um número pede medir de novo. */

@@ -4,7 +4,7 @@ import { join } from 'node:path'
 
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 
-import { HORIZON, MIN_LANDING_WINDOW_HOURS, PERIOD_DAYS } from './config.js'
+import { HORIZON, MIN_LANDING_WINDOW_HOURS, NEXT_WINDOW_PERIODS, PERIOD_DAYS } from './config.js'
 import { computeEphemeris } from './ephemeris.js'
 import { latLonToUnit } from './geometry.js'
 import { computeHorizon } from './horizon.js'
@@ -72,7 +72,8 @@ describe('céu de um ponto com o relevo do site (siteSky.js)', () => {
     const expected = summarizeSky(computeSeries(horizon, ephemeris), { minWindowHours: MIN_LANDING_WINDOW_HOURS, horizon })
 
     const sky = await createSiteSky(readFile)(TOP_1, NOV_14)
-    expect(sky).toEqual({ ...expected, terrain: { coarse: false, metersPerPixel: 80 } })
+    // com janela no período, a busca adiante não roda: nextWindow é null (card C18)
+    expect(sky).toEqual({ ...expected, terrain: { coarse: false, metersPerPixel: 80 }, nextWindow: null })
     // a vista do chão vem com o contorno do relevo do próprio ponto, e não vazia
     expect(sky.groundView.horizonDeg).toHaveLength(360)
   })
@@ -144,5 +145,46 @@ describe('céu de um ponto com o relevo do site (siteSky.js)', () => {
     expect(sky.terrain.coarse).toBe(true)
     expect(reads.slice(0, 2)).toEqual(['manifest.json', 'global/manifest.json'])
     expect(reads.slice(2).every((path) => path.startsWith('global/r'))).toBe(true)
+  })
+})
+
+/* Card C18: um ponto escolhido ao acaso quase sempre fica sem janela nos 30 dias da data, e a tela
+   só dizia "troque a data". O motor passa a procurar adiante, período depois de período. Os pontos
+   foram achados com o próprio motor em 19/11/2026, olhando 13 períodos a partir de 14/11/2026. */
+describe('a próxima janela de pouso, quando o período não tem nenhuma (card C18)', () => {
+  const DAY_MS = 24 * HOUR_MS
+  // perto do polo, sem janela nos seis primeiros períodos e com uma no sétimo
+  const LATER = { lat: -87.5, lon: -150 }
+  // o meio do lado oculto: a Terra nunca passa do horizonte
+  const FAR_SIDE = { lat: 0, lon: 180 }
+
+  it('acha a primeira janela dos períodos seguintes, igual à que o período dela dá', async () => {
+    const siteSky = createSiteSky(diskReader().readFile)
+    const sky = await siteSky(LATER, NOV_14)
+    expect(sky.landingWindows).toEqual([])
+    const periodStartMs = NOV_14 + 6 * PERIOD_DAYS * DAY_MS
+    expect(sky.nextWindow.periodStartUtc.getTime()).toBe(periodStartMs)
+    expect(sky.nextWindow.earthEverAboveHorizon).toBe(true)
+    const thatPeriod = await siteSky(LATER, periodStartMs)
+    expect(sky.nextWindow.landingWindow).toEqual(thatPeriod.landingWindows[0])
+  })
+
+  it('no lado oculto não acha janela e diz que a Terra nunca passou do horizonte', async () => {
+    const sky = await createSiteSky(diskReader().readFile)(FAR_SIDE, NOV_14)
+    expect(sky.landingWindows).toEqual([])
+    expect(sky.nextWindow.landingWindow).toBeNull()
+    expect(sky.nextWindow.periodStartUtc).toBeNull()
+    expect(sky.nextWindow.earthEverAboveHorizon).toBe(false)
+    // até onde procurou: o fim do último período olhado
+    expect(sky.nextWindow.searchedUntilUtc.getTime()).toBe(NOV_14 + (NEXT_WINDOW_PERIODS + 1) * PERIOD_DAYS * DAY_MS)
+  })
+
+  it('a posição do Sol e da Terra de cada período é guardada: o segundo ponto não refaz', async () => {
+    const siteSky = createSiteSky(diskReader().readFile)
+    await siteSky(FAR_SIDE, NOV_14)
+    const calls = computeEphemeris.mock.calls.length
+    expect(calls).toBe(NEXT_WINDOW_PERIODS + 1)
+    await siteSky({ lat: 0, lon: 179 }, NOV_14)
+    expect(computeEphemeris).toHaveBeenCalledTimes(calls)
   })
 })
