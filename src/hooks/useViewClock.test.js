@@ -59,4 +59,28 @@ describe('useViewClock', () => {
     act(() => vi.advanceTimersByTime(2000))
     expect(result.current.hour).toBe(240)
   })
+
+  /* A vista da missão troca o que o relógio cobre: o período, e depois a missão, do lançamento ao
+     pouso (card C16). A hora 300 do período não quer dizer nada na missão, que dura umas 110. */
+  it('quando o que o relógio cobre troca (resetKey), volta à hora zero e para de tocar', () => {
+    const { result, rerender } = renderHook(({ periodo, chave }) => useViewClock(periodo, HORAS_POR_SEGUNDO, chave), {
+      initialProps: { periodo: PERIODO_H, chave: 'periodo' },
+    })
+    act(() => result.current.seek(300))
+    act(() => result.current.setPlaying(true))
+    rerender({ periodo: 110, chave: 'missao' })
+    expect(result.current.hour).toBe(0)
+    expect(result.current.playing).toBe(false)
+    act(() => vi.advanceTimersByTime(2000))
+    expect(result.current.hour).toBe(0)
+  })
+
+  it('com a mesma resetKey, redesenhar a vista não mexe no relógio', () => {
+    const { result, rerender } = renderHook(({ chave }) => useViewClock(PERIODO_H, HORAS_POR_SEGUNDO, chave), {
+      initialProps: { chave: 'periodo' },
+    })
+    act(() => result.current.seek(300))
+    rerender({ chave: 'periodo' })
+    expect(result.current.hour).toBe(300)
+  })
 })

@@ -9,10 +9,20 @@ import { useCallback, useEffect, useState } from 'react'
 /* periodHours: quantas horas o relógio cobre; chegando ao fim, volta ao começo. hoursPerSecond:
    quantas horas do período passam por segundo, tocando. Devolve { hour, playing, setPlaying, seek }:
    hour vai de 0 até periodHours, com fração; seek(hora) leva o relógio até uma hora e para de
-   tocar, que é o que o cursor faz. */
-export function useViewClock(periodHours, hoursPerSecond) {
+   tocar, que é o que o cursor faz.
+   resetKey: o que o relógio está cobrindo; quando troca, ele volta à hora zero e para. A vista da
+   missão passa do período para a missão (card C16), e a hora de um não quer dizer nada no outro. */
+export function useViewClock(periodHours, hoursPerSecond, resetKey = null) {
   const [hour, setHour] = useState(0)
   const [playing, setPlaying] = useState(false)
+  /* A troca é vista durante o próprio render, e não num efeito: assim nenhum quadro é desenhado
+     com a hora velha no relógio novo, e o lint do projeto não aceita setState direto num efeito. */
+  const [coveredKey, setCoveredKey] = useState(resetKey)
+  if (coveredKey !== resetKey) {
+    setCoveredKey(resetKey)
+    setHour(0)
+    setPlaying(false)
+  }
 
   useEffect(() => {
     if (!playing) return
