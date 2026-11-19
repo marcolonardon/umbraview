@@ -108,6 +108,11 @@ installs everything on Windows, from scratch.
   window steps, paints on the Moon of the Mission view the same map of landing areas as the Moon
   view. In the Moon view, with a site chosen, "Plan a mission here" opens the Mission view on the
   window step.
+- Launch directions (card C19): each launch site can carry the range of directions it allows, with
+  its source (`azimuthLimits`, in `src/data/launchSites.js`). With a range, the mission launches
+  only in it, at another time of day if needed, and the launch site step separates the sites that
+  cannot reach the orbit of the chosen window. No range has a source yet, so every site shows
+  "Not checked" and missions are as before.
 - The orbit propagator of the engine (`src/engine/orbit.js`, card C14): given a position, a speed
   and an instant, where a spacecraft is later, under the gravity of the Earth, the Moon and the
   Sun, each in its real position. Checked against the flown path of Artemis I, from JPL Horizons:
@@ -368,6 +373,7 @@ umbraview/
 │   │   ├── horizon.js               the horizon of a point, direction by direction
 │   │   ├── landingAreas.js          which points of a grid have a landing window in the period of a date
 │   │   ├── landingGridFiles.js      the landing grid files, and the map mask for the scene
+│   │   ├── launchLimits.js          the launch direction of an orbit plane at a pad, and whether the pad allows it (card C19)
 │   │   ├── mission.js               the reference mission: from a launch site to a landing site inside a landing window (card C15)
 │   │   ├── orbit.js                 the orbit propagator: a spacecraft under the gravity of the Earth, the Moon and the Sun (card C14)
 │   │   ├── relief.js                the terrain height at a point: polar, cylindrical or tiled grid
@@ -383,6 +389,7 @@ umbraview/
 │   │   ├── useFarRelief.js          the pole's coarse terrain, for the scene mesh (card C2)
 │   │   ├── useGlobalTiles.js        the whole-Moon terrain tiles around the camera (exp/lua-inteira-com-relevo)
 │   │   ├── useLandingAreas.js       the map of areas with a landing window on the date, computed in a Worker
+│   │   ├── useLaunchReach.js        which launch sites reach the orbit of the chosen landing window, in the directions they allow (card C19)
 │   │   ├── useKeepFocus.js          takes the keyboard focus to a target when the control that had it leaves the page (card C17)
 │   │   ├── useMission.js            the reference mission for a launch site, a landing site and a window, computed in a Worker (card C15)
 │   │   ├── useNearTiles.js          the fine terrain tiles around the camera (card C6)

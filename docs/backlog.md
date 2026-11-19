@@ -2830,6 +2830,70 @@ on the launch site step, past the windows.
 - The site panel of the Moon view could show the next window too, when the period has none.
 - Suggest, from the map, the nearest point with a window to the point clicked.
 
+### C19 · Launch only in the directions each launch site allows
+
+**Status:** built on 19/11 in Marco's fork, born from the branch of card C18. The engine, the
+screen and the data field are done; **no launch site has a source for its range yet**, so every
+site shows "Not checked" and the missions are the same as before. Waiting for the sources and for
+Marco's check · **Depends on:** C18
+
+**What it is for.** Marco asked on 19/11 whether any launch site can be chosen for any landing
+window. In the model, yes: the engine chose the launch time by the inclination of the orbit, and
+the launch direction came out of it with no limit. A real launch site only launches over the sea or
+over empty land, in a range of directions. The plan is in Marco's document "Plano: bases de
+lançamento que servem para cada missão" (claude.ai, 19/11/2026).
+
+**As it turned out.**
+- **The data** (`azimuthLimits`, in `src/data/launchSites.js`): a list of ranges per launch site,
+  `[{ minDeg, maxDeg, sourceUrl }]`, in degrees from north to east, or `null` without a source. It is
+  `null` in all 15: none was looked up yet. With `null` nothing is ruled out, and the details say
+  "Not checked". `launchSites.test.js` checks the field and each range.
+- **The geometry** (`src/engine/launchLimits.js`): `launchAzimuthDeg`, the direction of an orbit
+  plane at the pad (moved out of `mission.js`), and `allowsAzimuth`, whether it falls in a range.
+  The azimuth is that of the plane in the frame that does not turn with the Earth; the turn of the
+  Earth moves the real heading on the ground by a few degrees, and that was not measured.
+- **The mission keeps to the range** (`launchCandidates`, in `src/engine/mission.js`). The search for
+  the launch time now only takes instants whose azimuth is in the range. If the lowest inclination
+  of the day is outside it, the edge of the range nearest to it is used. The aim still turns the
+  plane by 0.2° to 2.9° after the search (measured on 19/11 from Kennedy with a test range of 140°
+  to 170°, in three windows), so the search narrows the range by 1°, 3°, 6° and 10° in turn, and
+  keeps the first mission that comes out inside it. With no time of the day in the range, the
+  mission fails with `code: 'azimuth'`.
+- **Which launch sites reach the orbit** (`launchReach`, in `mission.js`, through
+  `useLaunchReach`): the geometry of the launch only, without aiming, for the 15 sites when the
+  window changes. About 20 ms for the 15 (measured on 19/11 in Node, on Marco's computer), so it
+  runs on the page's main thread. Only the window counts: the plane of the launch depends on the
+  Moon at the arrival, not on the landing site.
+- **The screen.** In the launch site step, the sites that cannot reach the orbit go to a last group
+  of the list, "Can't reach this orbit", still selectable, and their marks on the Earth are drawn in
+  the muted color. Choosing one, the card says "From this launch site, no launch on that day heads in
+  a direction the site allows…", and Launch stays off (`reason: 'azimuth'` from `useMission`). The
+  details show "Allowed launch directions". The note on what was left out no longer says the
+  directions are left out.
+
+**Verified** on 19/11/2026, with the dev server in the app's browser pane (Chromium), at
+1440 × 900, with two test ranges put in the data for the check and taken out after it (LC-39A
+200° to 250°, LC-39B 140° to 170°), Athena (IM-2) and its first window:
+- The list put LC-39A alone in "Can't reach this orbit", and choosing it gave the notice and Launch
+  off.
+- LC-39B: "Ready to launch.", launch heading 141° from north, parking orbit at 56.4°, and the range
+  "140° to 170° from north" in the details. Before the narrowing in steps, this same case failed
+  (seen in the browser).
+- Test first: the tests of the geometry, of the mission with the ranges (the same mission without a
+  range, the southeast range, the west range, the retry in two windows), of the quick count, of the
+  hooks, of the view and of the data failed before the code.
+- `npm run verify` passes, with 994 tests in 70 files and no lint warning.
+- Not verified: the muted marks on the Earth were not looked at (the pads of Kennedy sit on top of
+  each other); real ranges, which have no source; a touch screen; a real screen reader.
+
+**What is missing to finish the card.**
+- **The sources of the 15 ranges** (`TODO_PREENCHER` in spirit: today `null`). One public document
+  per site (the user's guide of a rocket, the range, the regulator), its line copied to
+  `scripts/references/`, and the source in `CREDITS.md`. Who looks them up is Marco's decision.
+- Only launches toward the east half (0° to 180°) are possible: the engine always takes the plane
+  that turns with the Earth. A site that only launches to the west (none of the 15, as far as we
+  know; not checked) would be "Can't reach this orbit" in every window.
+
 ---
 
 ## I: Miguel
