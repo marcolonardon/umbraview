@@ -551,6 +551,24 @@ describe('MissionView: voando', () => {
     expect(screen.getByText(missionView.mapCaption)).toBeInTheDocument()
   })
 
+  /* O mapa cobre um canto da cena: dá para ocultá-lo, e um botão pequeno continua lá para trazê-lo
+     de volta (visto pelo Marco em 19/11/2026, que pediu para poder esconder). */
+  it('um botão oculta o mapa e outro o traz de volta, e a escolha vale para o próximo lançamento', () => {
+    voar()
+    const ocultar = screen.getByRole('button', { name: missionView.mapHide })
+    expect(ocultar).toHaveAttribute('aria-expanded', 'true')
+    fireEvent.click(ocultar)
+    expect(screen.queryByRole('img', { name: missionView.mapLabel })).not.toBeInTheDocument()
+    const mostrar = screen.getByRole('button', { name: missionView.mapShow })
+    expect(mostrar).toHaveAttribute('aria-expanded', 'false')
+    // trocar a missão e lançar de novo não traz o mapa de volta sozinho
+    fireEvent.click(screen.getByRole('button', { name: missionView.changeMission }))
+    fireEvent.click(lancar())
+    expect(screen.queryByRole('img', { name: missionView.mapLabel })).not.toBeInTheDocument()
+    fireEvent.click(screen.getByRole('button', { name: missionView.mapShow }))
+    expect(screen.getByRole('img', { name: missionView.mapLabel })).toBeInTheDocument()
+  })
+
   it('a velocidade tem dois valores, e o botão dela diz qual está ligado', () => {
     voar()
     const rapido = screen.getByRole('button', { name: missionView.fastLabel })

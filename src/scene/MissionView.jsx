@@ -656,6 +656,8 @@ export function MissionView({
   const [fast, setFast] = useState(false)
   // voando, a câmera se põe sozinha, a não ser que a pessoa a solte
   const [freeCamera, setFreeCamera] = useState(false)
+  // o mapa pequeno do voo, oculto pela pessoa: vale para os próximos lançamentos também
+  const [mapHidden, setMapHidden] = useState(false)
   const clock = useViewClock(
     TRACK_STEPS + 1,
     (TRACK_STEPS / MISSION_PLAY_SECONDS) * (fast ? FAST_FACTOR : 1),
@@ -923,7 +925,16 @@ export function MissionView({
             />
           )}
           {/* O trajeto inteiro, em escala, num canto: na cena, com a câmera na nave, ele não cabe. */}
-          {flying && <MissionMap map={map} craft={craftOnMap} moon={mapPoint(state.moonKm)} dateMs={dateMs} />}
+          {flying && (
+            <MissionMap
+              map={map}
+              craft={craftOnMap}
+              moon={mapPoint(state.moonKm)}
+              dateMs={dateMs}
+              hidden={mapHidden}
+              onToggle={() => setMapHidden((value) => !value)}
+            />
+          )}
         </div>
         {/* O resumo do pouso, por cima da cena, no canto onde ficava o cartão do lançamento. */}
         {complete && <MissionComplete mission={mission} onRelaunch={launch} />}

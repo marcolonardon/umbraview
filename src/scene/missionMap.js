@@ -16,6 +16,10 @@
 const MAX_PIECES = 120
 // a folga em volta do caminho, em vezes o tamanho dele: a Terra e a Lua não encostam na borda
 const MARGIN = 0.12
+/* A largura sobre a altura da moldura, sempre a mesma, deitada. Seguindo o formato do caminho, uma
+   travessia quase reta para o norte deixava o mapa com 200 × 490 pixels, por cima dos controles do
+   lado direito da cena (visto pelo Marco em 19/11/2026). O caminho fica no meio, na mesma escala. */
+export const MAP_ASPECT = 4 / 3
 
 /* Do desenho do system.js (km, y para o norte da eclíptica) para o mapa: [x, y], com o y do mapa
    para baixo, como no SVG. Visto do norte, é assim que o que gira no sentido anti-horário (a Lua
@@ -60,9 +64,14 @@ export function missionMap(mission, moonOrbitKm) {
   const height = Math.max(...ys) - minY
   // a mesma folga dos quatro lados, pelo maior dos dois tamanhos
   const margin = Math.max(width, height) * MARGIN
+  // o lado que falta para o formato do mapa cresce por igual dos dois lados, e o caminho fica no meio
+  const framedWidth = Math.max(width + 2 * margin, (height + 2 * margin) * MAP_ASPECT)
+  const framedHeight = framedWidth / MAP_ASPECT
+  const centerX = minX + width / 2
+  const centerY = minY + height / 2
   return {
     path,
     orbit: moonOrbitKm.map(mapPoint),
-    viewBox: [minX - margin, minY - margin, width + 2 * margin, height + 2 * margin],
+    viewBox: [centerX - framedWidth / 2, centerY - framedHeight / 2, framedWidth, framedHeight],
   }
 }

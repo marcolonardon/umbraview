@@ -124,6 +124,9 @@ export const missionView = {
   mapLabel:
     'Map of the whole path of the mission, seen from above: the Earth, the orbit of the Moon, the Moon, the crossing and the spacecraft.',
   mapCaption: 'Whole path, to scale. The Moon and the spacecraft are dots.',
+  // o botão do mapa: ele cobre um canto da cena, e dá para ocultá-lo
+  mapHide: 'Hide map',
+  mapShow: 'Show map',
   // a legenda do trilho: os nomes das fases, embaixo dele
   timelineLabel: 'Mission phases',
   // o cartão de voo: a fase, o tempo de missão e a nave em números

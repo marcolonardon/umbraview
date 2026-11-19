@@ -3,7 +3,7 @@ import { describe, expect, it } from 'vitest'
 
 import { computeMission } from '../engine/mission.js'
 import { moonOrbitPath, systemStateAt } from '../engine/system.js'
-import { flownOnMap, mapPoint, missionMap } from './missionMap.js'
+import { MAP_ASPECT, flownOnMap, mapPoint, missionMap } from './missionMap.js'
 
 // uma missão de verdade, do motor: de Kennedy ao pouso da IM-2, na janela de 05/12/2026
 const MISSAO = computeMission({
@@ -83,5 +83,36 @@ describe('a parte já voada da linha do mapa (flownOnMap)', () => {
   it('depois da travessia é a linha inteira, sem a nave: ela já está em volta da Lua', () => {
     expect(flownOnMap(caminho, 31000, nave)).toEqual([[0, 0], [5, 1], [9, 4]])
     expect(flownOnMap(caminho, 30000, nave)).toEqual([[0, 0], [5, 1], [9, 4]])
+  })
+})
+
+/* A moldura tem sempre o mesmo formato, deitado (visto pelo Marco em 19/11/2026): ela seguia o
+   formato do caminho, e numa travessia quase em linha reta para o norte o mapa ficava com 200 × 490
+   pixels e cobria os controles do lado direito da cena. O caminho fica no meio, na mesma escala. */
+describe('o formato da moldura do mapa', () => {
+  // uma travessia de mentira, quase toda num eixo só, para os dois lados
+  const missaoReta = (deitada) => {
+    const pontos = 50
+    const timesMs = Float64Array.from({ length: pontos }, (_, i) => i * 3600e3)
+    const positionsKm = new Float32Array(pontos * 3)
+    for (let i = 0; i < pontos; i += 1) {
+      const andado = (380000 * i) / (pontos - 1)
+      positionsKm[3 * i] = deitada ? andado : 20000
+      positionsKm[3 * i + 2] = deitada ? 20000 : andado
+    }
+    return { segments: [{ phase: 'crossing', timesMs, positionsKm }] }
+  }
+
+  it.each([['em pé', false], ['deitada', true], ['de verdade', null]])('a moldura de uma travessia %s tem o formato do mapa', (_, deitada) => {
+    const resultado = deitada === null ? mapa : missionMap(missaoReta(deitada), ORBITA)
+    const [x, y, largura, altura] = resultado.viewBox
+    expect(largura / altura).toBeCloseTo(MAP_ASPECT, 9)
+    const dentro = (px, py) => px > x && px < x + largura && py > y && py < y + altura
+    expect(dentro(0, 0)).toBe(true)
+    for (const ponto of resultado.path) expect(dentro(ponto.x, ponto.y)).toBe(true)
+  })
+
+  it('o formato é deitado: mais largo que alto', () => {
+    expect(MAP_ASPECT).toBeGreaterThan(1)
   })
 })

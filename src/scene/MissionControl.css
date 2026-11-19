@@ -526,6 +526,28 @@
   font-size: var(--font-size-xs);
 }
 
+/* O botão de ocultar e mostrar: o mapa não pega o mouse (a cena embaixo dele continua girando),
+   mas o botão pega. Oculto, o mapa vira só o botão, no mesmo canto. */
+.mission-map__toggle {
+  align-self: flex-end;
+  padding: 0 var(--space-2);
+  border: 1px solid var(--color-border-control);
+  border-radius: var(--radius-sm);
+  background: var(--color-bg);
+  color: var(--color-text-secondary);
+  font: inherit;
+  font-size: var(--font-size-xs);
+  cursor: pointer;
+  pointer-events: auto;
+}
+
+.mission-map--hidden {
+  width: auto;
+  padding: 0;
+  border: 0;
+  background: none;
+}
+
 /* Em tela de celular o mapa encolhe e fica sem a legenda (o nome dele, para o leitor de tela,
    continua): do tamanho inteiro ele cobria o cartão de voo. */
 @media (max-width: 600px) {
