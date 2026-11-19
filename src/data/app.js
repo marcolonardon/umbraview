@@ -9,6 +9,8 @@ export const app = {
   },
   panel: {
     title: 'Landing site',
+    // Leva o ponto escolhido para a vista da missão, já no passo da janela de pouso (card C18).
+    planMission: 'Plan a mission here',
   },
   footer: 'Umbra Team · NASA Space Apps Challenge 2026',
   // O guia de submissão de 2026 pede marca visível em toda imagem feita com IA, e o logo está na

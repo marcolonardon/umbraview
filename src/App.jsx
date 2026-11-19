@@ -53,6 +53,15 @@ export default function App() {
      Fica aqui pelo mesmo motivo. Se a data ou o local mudam e essa janela deixa de existir, a
      vista usa a primeira da lista (MissionView.jsx). */
   const [landingWindowStartMs, setLandingWindowStartMs] = useState(null)
+  /* Em que passo a vista da missão abre: 1, o da janela, quando a pessoa veio do botão "Plan a
+     mission here" com o ponto já escolhido (card C18); null, pelo seletor de vista, que abre no
+     primeiro passo que falta. Sem o 1, a primeira janela vinha escolhida e o painel pulava direto
+     para a base, sem a pessoa ver as janelas do ponto. */
+  const [missionStartStep, setMissionStartStep] = useState(null)
+  const showView = (next) => {
+    setMissionStartStep(null)
+    setView(next)
+  }
   const { status, sky } = useSiteSky(site, dateUtc)
 
   return (
@@ -73,13 +82,13 @@ export default function App() {
           <section className="app__scene" aria-labelledby="scene-title">
             <h2 id="scene-title" className="app__region-title app__region-title--over">{app.scene.title}</h2>
             <div className="app__views" role="group" aria-label={systemView.viewLabel}>
-              <button className="app__view" type="button" aria-pressed={view === 'moon'} onClick={() => setView('moon')}>
+              <button className="app__view" type="button" aria-pressed={view === 'moon'} onClick={() => showView('moon')}>
                 {systemView.viewMoon}
               </button>
-              <button className="app__view" type="button" aria-pressed={view === 'system'} onClick={() => setView('system')}>
+              <button className="app__view" type="button" aria-pressed={view === 'system'} onClick={() => showView('system')}>
                 {systemView.viewSystem}
               </button>
-              <button className="app__view" type="button" aria-pressed={view === 'mission'} onClick={() => setView('mission')}>
+              <button className="app__view" type="button" aria-pressed={view === 'mission'} onClick={() => showView('mission')}>
                 {missionView.viewMission}
               </button>
             </div>
@@ -107,10 +116,15 @@ export default function App() {
                 landingSite={site}
                 skyStatus={status}
                 landingWindows={sky?.landingWindows ?? null}
+                nextWindow={sky?.nextWindow ?? null}
                 landingWindowStartMs={landingWindowStartMs}
                 onLandingWindowChange={setLandingWindowStartMs}
                 sites={sites}
                 onLandingSiteChange={setSite}
+                startStep={missionStartStep}
+                // o mesmo mapa das áreas de pouso da vista da Lua, ligado pelo mesmo estado (card C18)
+                showLandingAreas={showLandingAreas}
+                onToggleLandingAreas={() => setShowLandingAreas((shown) => !shown)}
               />
             )}
           </section>
@@ -129,6 +143,21 @@ export default function App() {
             <SiteList sites={sites} selectedId={site?.id} onSelect={setSite} />
             <DateTimeControl dateUtc={dateUtc} onChange={setDateUtc} />
             <SitePanel status={status} sky={sky} />
+            {/* Com um ponto escolhido, um caminho direto para a missão até ele (card C18): o ponto
+                já é o mesmo nas duas vistas, e a missão abre no passo da janela. Fora do
+                SitePanel, que é um role="status": um botão lá dentro seria lido a cada conta. */}
+            {site && (
+              <button
+                className="app__plan-mission"
+                type="button"
+                onClick={() => {
+                  setMissionStartStep(1)
+                  setView('mission')
+                }}
+              >
+                {app.panel.planMission}
+              </button>
+            )}
             {/* por último: quem já escolheu um ponto quer os números primeiro */}
             <About />
           </section>

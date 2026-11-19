@@ -384,3 +384,46 @@ describe('App, a vista da missão (card C13)', () => {
     expect(vistaDaMissao.props.launchSiteId).toBe('ksc-lc39a')
   })
 })
+
+/* Card C18: quem escolheu o ponto na vista da Lua vai direto para a missão até ele. Antes era
+   preciso achar o seletor "Mission" em cima da cena, e nada dizia que o ponto ia junto. */
+describe('App, da vista da Lua para a missão (card C18)', () => {
+  it('sem ponto escolhido, o botão de planejar a missão não aparece', () => {
+    render(<App />)
+    expect(screen.queryByRole('button', { name: app.panel.planMission })).not.toBeInTheDocument()
+  })
+
+  it('com um ponto escolhido, o botão abre a vista da missão com esse ponto como local de pouso', () => {
+    render(<App />)
+    act(() => sceneProps.onSelect(TOP_1))
+    fireEvent.click(screen.getByRole('button', { name: app.panel.planMission }))
+    expect(screen.getByRole('button', { name: missionView.viewMission })).toHaveAttribute('aria-pressed', 'true')
+    expect(screen.getByTestId('vista-da-missao')).toBeInTheDocument()
+    expect(vistaDaMissao.props.landingSite).toEqual(TOP_1)
+    // vindo do ponto, a missão abre no passo da janela: a pessoa quer ver as janelas dele
+    expect(vistaDaMissao.props.startStep).toBe(1)
+  })
+
+  it('pelo seletor de vista, a missão abre no primeiro passo que falta, como antes', () => {
+    render(<App />)
+    act(() => sceneProps.onSelect(TOP_1))
+    fireEvent.click(screen.getByRole('button', { name: missionView.viewMission }))
+    expect(vistaDaMissao.props.startStep).toBeNull()
+  })
+
+  it('a vista da missão recebe a próxima janela do céu do ponto e o mesmo mapa de áreas da vista da Lua', async () => {
+    openPageWithReliefFromDisk()
+    render(<App />)
+    fireEvent.click(screen.getByRole('button', { name: missionView.viewMission }))
+    expect(vistaDaMissao.props.nextWindow).toBeNull()
+    expect(vistaDaMissao.props.showLandingAreas).toBe(false)
+    act(() => vistaDaMissao.props.onToggleLandingAreas())
+    expect(vistaDaMissao.props.showLandingAreas).toBe(true)
+    // o TOP_1 tem janela no período: a busca adiante não roda, e o céu entrega null
+    act(() => vistaDaMissao.props.onLandingSiteChange(TOP_1))
+    await waitFor(() => expect(vistaDaMissao.props.skyStatus).toBe('ready'), WAIT)
+    expect(vistaDaMissao.props.nextWindow).toBeNull()
+    fireEvent.click(screen.getByRole('button', { name: systemView.viewMoon }))
+    expect(screen.getByRole('button', { name: scene.landingToggle })).toHaveAttribute('aria-pressed', 'true')
+  })
+})

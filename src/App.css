@@ -93,6 +93,25 @@
   border-inline-start: 1px solid var(--color-border);
 }
 
+/* O caminho do ponto para a missão (card C18), com a cara do botão Launch do painel da missão:
+   é o passo seguinte de quem já achou onde pousar. */
+.app__plan-mission {
+  padding: var(--space-2) var(--space-3);
+  border: 1px solid var(--color-accent);
+  border-radius: var(--radius-sm);
+  background: var(--color-accent);
+  color: var(--color-on-accent);
+  font: inherit;
+  font-size: var(--font-size-sm);
+  font-weight: var(--font-weight-medium);
+  cursor: pointer;
+  transition: transform var(--duration-press) var(--ease-out);
+}
+
+.app__plan-mission:active {
+  transform: scale(0.98);
+}
+
 .app__region-title {
   color: var(--color-text-muted);
   font-size: var(--font-size-xs);
