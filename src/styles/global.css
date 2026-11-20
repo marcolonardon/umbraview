@@ -44,14 +44,17 @@ p {
 }
 
 /* Quem pediu menos movimento no sistema não vê transição de posição nem voo de câmera.
-   A cena 3D lê a mesma preferência (card C1). */
+   A cena 3D lê a mesma preferência (card C1).
+   Transição nenhuma, e não de 1 ms: o que muda a cada quadro (o ponto da nave, a linha voada e os
+   mostradores do painel de voo) começava uma transição nova a cada quadro e ficava parado no valor
+   de antes (global.test.js). */
 @media (prefers-reduced-motion: reduce) {
   *,
   *::before,
   *::after {
     animation-duration: 1ms !important;
     animation-iteration-count: 1 !important;
-    transition-duration: 1ms !important;
+    transition: none !important;
     scroll-behavior: auto !important;
   }
 }
