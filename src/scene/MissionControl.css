@@ -335,7 +335,7 @@
 
 /* Os rótulos curtos da faixa: caixa alta e espaçados, como nas transmissões. O texto continua
    escrito normal em src/data/, para o leitor de tela. */
-.mission-hud__gauge-label,
+.mission-hud__readout-label,
 .mission-hud__caption,
 .mission-hud__mission,
 .mission-hud__event-title,
@@ -344,78 +344,119 @@
   letter-spacing: var(--tracking-caps);
 }
 
-.mission-hud__gauges {
-  display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: var(--space-1) var(--space-3);
-  max-width: 15rem;
-}
-
-.mission-hud__gauge {
-  position: relative;
-  display: grid;
-  justify-items: center;
-  align-content: center;
-  aspect-ratio: 1;
-}
-
-.mission-hud__gauge-dial {
-  position: absolute;
-  inset: 0;
-  width: 100%;
-  height: 100%;
-}
-
-.mission-hud__gauge-track,
-.mission-hud__gauge-fill {
-  fill: none;
-  stroke-width: 3;
-  stroke-linecap: round;
-}
-
-.mission-hud__gauge-track {
-  stroke: var(--color-border-control);
-  stroke-opacity: 0.5;
-}
-
-/* Sem transição: o número muda a cada quadro, e cada transição nova recomeçava a anterior, com o
-   arco sempre atrasado e aos trancos (visto pelo Marco em 19/11/2026). */
-.mission-hud__gauge-fill {
-  stroke: var(--color-text);
-}
-
-.mission-hud__gauge-label {
-  color: var(--color-text-secondary);
-  font-size: var(--font-size-xs);
-}
-
-.mission-hud__gauge-value {
-  font-size: var(--font-size-lg);
-  font-weight: var(--font-weight-medium);
-  font-variant-numeric: tabular-nums;
-  line-height: 1.1;
-}
-
-.mission-hud__gauge-unit {
-  max-width: 80%;
-  color: var(--color-text-muted);
-  font-size: var(--font-size-xs);
-  line-height: 1.2;
-  text-align: center;
-}
-
-.mission-hud__gauge-scale {
-  color: var(--color-text-muted);
-  font-size: var(--font-size-xs);
-  font-variant-numeric: tabular-nums;
-  line-height: 1.2;
+/* A telemetria: os três anéis e, ao lado, a legenda. A coluna fica no lugar mesmo vazia (nos trechos
+   desenhados), para o arco e a fase não pularem. */
+.mission-hud__telemetry {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  min-width: 0;
 }
 
 .mission-hud__caption {
-  grid-column: 1 / -1;
   color: var(--color-text-secondary);
   font-size: var(--font-size-xs);
-  text-align: center;
+}
+
+.mission-hud__instrument {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+}
+
+.mission-hud__rings {
+  flex: none;
+  width: 6.5rem;
+  height: 6.5rem;
+}
+
+/* Cada anel tem a cor da linha dele na legenda: a distância até a Lua no cinza da Lua, a altura no
+   texto e a velocidade no destaque. Sem transição: o valor muda a cada quadro (global.test.js). */
+.mission-hud__ring-track,
+.mission-hud__ring-fill {
+  fill: none;
+  stroke-linecap: round;
+}
+
+.mission-hud__ring-track {
+  stroke: var(--color-border);
+}
+
+.mission-hud__ring--moon .mission-hud__ring-fill {
+  stroke: var(--color-moon);
+}
+
+.mission-hud__ring--altitude .mission-hud__ring-fill {
+  stroke: var(--color-text);
+}
+
+.mission-hud__ring--speed .mission-hud__ring-fill {
+  stroke: var(--color-accent);
+}
+
+.mission-hud__readouts {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+  min-width: 0;
+}
+
+/* Uma linha da legenda: um traço na cor do anel à esquerda, o rótulo e a escala em cima, um em cada
+   ponta, e o número embaixo, na largura toda: ao lado do número, a escala de "km above the Earth"
+   quebrava em duas linhas (visto num Chrome sem janela). */
+.mission-hud__readout {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  column-gap: var(--space-3);
+  padding-left: var(--space-2);
+  border-left: 2px solid var(--readout-color, var(--color-text));
+}
+
+.mission-hud__readout--moon {
+  --readout-color: var(--color-moon);
+}
+
+.mission-hud__readout--altitude {
+  --readout-color: var(--color-text);
+}
+
+.mission-hud__readout--speed {
+  --readout-color: var(--color-accent);
+}
+
+.mission-hud__readout-label {
+  grid-row: 1;
+  grid-column: 1;
+  color: var(--color-text-secondary);
+  font-size: var(--font-size-xs);
+  line-height: 1.2;
+}
+
+.mission-hud__readout-value {
+  grid-row: 2;
+  grid-column: 1 / -1;
+  font-size: var(--font-size-md);
+  font-weight: var(--font-weight-medium);
+  font-variant-numeric: tabular-nums;
+  line-height: 1.2;
+  white-space: nowrap;
+}
+
+.mission-hud__readout-unit {
+  color: var(--color-text-muted);
+  font-size: var(--font-size-xs);
+  font-weight: var(--font-weight-regular);
+}
+
+.mission-hud__readout-scale {
+  grid-row: 1;
+  grid-column: 2;
+  align-self: end;
+  color: var(--color-text-muted);
+  font-size: var(--font-size-xs);
+  font-variant-numeric: tabular-nums;
+  line-height: 1.2;
+  text-align: right;
 }
 
 .mission-hud__center {
@@ -529,6 +570,25 @@
   line-height: 1.1;
 }
 
+/* Quanto o tempo está acelerado: o rótulo em caixa alta, o fator no destaque e o segundo de tela. */
+.mission-hud__warp {
+  margin: 0;
+  color: var(--color-text-secondary);
+  font-size: var(--font-size-xs);
+  font-variant-numeric: tabular-nums;
+}
+
+.mission-hud__warp-label {
+  letter-spacing: var(--tracking-caps);
+  text-transform: uppercase;
+}
+
+.mission-hud__warp-value {
+  color: var(--color-accent);
+  font-size: var(--font-size-sm);
+  font-weight: var(--font-weight-medium);
+}
+
 .mission-hud__mission {
   overflow: hidden;
   max-width: 100%;
@@ -576,6 +636,42 @@
   font-weight: var(--font-weight-medium);
 }
 
+/* O seletor da velocidade de tocar: três botões colados, como um interruptor de três posições. */
+.mission-hud__speeds {
+  display: inline-flex;
+  margin-top: var(--space-2);
+  border: 1px solid var(--color-border-control);
+  border-radius: var(--radius-sm);
+  overflow: hidden;
+  pointer-events: auto;
+}
+
+.mission-hud__speed {
+  min-width: 2.5rem;
+  padding: var(--space-1) var(--space-2);
+  border: 0;
+  background: var(--color-bg);
+  color: var(--color-text-secondary);
+  font: inherit;
+  font-size: var(--font-size-xs);
+  font-variant-numeric: tabular-nums;
+  cursor: pointer;
+}
+
+.mission-hud__speed + .mission-hud__speed {
+  border-left: 1px solid var(--color-border-control);
+}
+
+.mission-hud__speed[aria-pressed='true'] {
+  background: var(--color-text);
+  color: var(--color-bg);
+  font-weight: var(--font-weight-medium);
+}
+
+.mission-hud__speed:focus-visible {
+  box-shadow: inset 0 0 0 2px var(--color-focus);
+}
+
 .mission-hud__buttons {
   display: flex;
   flex-wrap: wrap;
@@ -621,9 +717,6 @@
     order: -1;
   }
 
-  .mission-hud__gauges {
-    max-width: 12rem;
-  }
 }
 
 /* Celular: a faixa sai de cima da cena e fica embaixo dela, sem o degradê, como o resumo e o selo
@@ -637,6 +730,17 @@
 
   .mission-hud__time {
     font-size: var(--font-size-lg);
+  }
+
+  /* No celular a telemetria ganha a linha toda: numa metade, a legenda dos três números não cabia
+     ao lado dos anéis. */
+  .mission-hud__telemetry {
+    grid-column: 1 / -1;
+  }
+
+  .mission-hud__rings {
+    width: 5rem;
+    height: 5rem;
   }
 }
 
@@ -705,19 +809,47 @@
   font-size: var(--font-size-xs);
 }
 
-/* O botão de ocultar e mostrar: o mapa não pega o mouse (a cena embaixo dele continua girando),
-   mas o botão pega. Oculto, o mapa vira só o botão, no mesmo canto. */
-.mission-map__toggle {
+/* Os botões do mapa, só de ícone, no canto de cima dele: o mapa não pega o mouse (a cena embaixo
+   continua girando), mas os botões pegam. Oculto, o mapa vira só o botão de mostrar, no mesmo canto. */
+.mission-map__buttons {
+  display: flex;
   align-self: flex-end;
-  padding: 0 var(--space-2);
+  gap: var(--space-1);
+  pointer-events: auto;
+}
+
+.mission-map__icon-button {
+  display: inline-grid;
+  place-items: center;
+  width: var(--space-6);
+  height: var(--space-6);
+  padding: 0;
   border: 1px solid var(--color-border-control);
   border-radius: var(--radius-sm);
   background: var(--color-bg);
   color: var(--color-text-secondary);
-  font: inherit;
-  font-size: var(--font-size-xs);
   cursor: pointer;
   pointer-events: auto;
+}
+
+.mission-map__icon-button:hover {
+  color: var(--color-text);
+}
+
+.mission-map__icon {
+  width: var(--space-4);
+  height: var(--space-4);
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 2;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+/* Aumentado, o mapa tem o dobro da largura: dá para ver a curva da travessia perto da Terra e da Lua. */
+.mission-map[data-size='large'] {
+  width: var(--panel-width);
+  max-width: calc(100% - var(--space-6));
 }
 
 .mission-map--hidden {
@@ -740,16 +872,23 @@
   }
 }
 
-/* O resumo do pouso, na cor de coisa que deu certo. */
+/* O resumo do pouso, na cor de coisa que deu certo, dentro da faixa do painel de voo: ela não pega o
+   mouse, e o resumo pega, pelo botão de lançar de novo. */
+/* Numa linha só, embaixo do relógio: o título, os dois números e o botão de lançar de novo. Baixo,
+   para caber na faixa mesmo numa tela de 720 px de altura (visto num Chrome sem janela). */
 .mission-complete {
   display: flex;
   flex-wrap: wrap;
   align-items: center;
-  gap: var(--space-3) var(--space-8);
-  padding: var(--space-4);
+  justify-content: center;
+  gap: var(--space-2) var(--space-6);
+  margin-top: var(--space-2);
+  padding: var(--space-3);
   border: 1px solid var(--color-success);
   border-radius: var(--radius-md);
   background: var(--color-success-surface);
+  text-align: left;
+  pointer-events: auto;
 }
 
 .mission-complete__title {
@@ -762,7 +901,7 @@
 .mission-complete__facts {
   display: flex;
   flex-wrap: wrap;
-  gap: var(--space-3) var(--space-8);
+  gap: var(--space-2) var(--space-6);
   margin: 0;
 }
 
@@ -772,7 +911,8 @@
 }
 
 .mission-complete__facts dd {
-  margin: var(--space-1) 0 0;
-  font-size: var(--font-size-lg);
+  margin: 0;
+  font-size: var(--font-size-md);
+  font-weight: var(--font-weight-medium);
   font-variant-numeric: tabular-nums;
 }

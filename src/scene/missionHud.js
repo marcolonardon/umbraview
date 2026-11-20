@@ -3,6 +3,9 @@
  *
  * Este arquivo não conhece o React: recebe números e devolve números, para ser testado no Node.
  */
+import { MOON_RADIUS_M } from '../engine/geometry.js'
+
+const MOON_RADIUS_KM = MOON_RADIUS_M / 1000
 /* Um ponto do arco do trilho, [x, y] em pixels do desenho. fraction: o lugar no trilho, de 0 a 1.
    width: a largura do arco. sag: quanto as pontas ficam abaixo do meio. O arco é um pedaço de
    círculo que passa pelas duas pontas, embaixo, e pelo meio, em cima (y = 0).
@@ -49,3 +52,28 @@ export function gaugeScale(value) {
   }
   return Number((10 * decade).toPrecision(12))
 }
+
+/* A distância da nave até o chão da Lua, em km: o terceiro mostrador (pedido pelo Marco em
+   19/11/2026). Na órbita de espera a altura e a velocidade não mudam, porque a órbita é um círculo;
+   a distância até a Lua muda o tempo todo, uns 13 mil km a cada volta em volta da Terra.
+   craft: a nave, { center, positionKm }, como spacecraftAt (missionPath.js) a dá: contada do centro
+   da Terra ou do da Lua, no desenho do system.js. moonKm: a Lua no mesmo instante e no mesmo desenho
+   (systemStateAt). Nunca negativa. */
+export function moonDistanceKm({ center, positionKm }, moonKm) {
+  const [x, y, z] = center === 'moon'
+    ? positionKm
+    : [positionKm[0] - moonKm[0], positionKm[1] - moonKm[1], positionKm[2] - moonKm[2]]
+  return Math.max(0, Math.hypot(x, y, z) - MOON_RADIUS_KM)
+}
+
+/* Quantas vezes mais rápido que o tempo de verdade a missão anda numa fase: os segundos da fase sobre
+   os segundos de tela que ela leva (pedido pelo Marco em 19/11/2026). O trilho dá a cada fase um
+   pedaço pelo peso dela (trackLayout, em missionPath.js), e não pelo tempo: a aceleração muda de uma
+   fase para outra, de centenas de vezes na subida a dezenas de milhares na travessia.
+   piece: o pedaço da fase no trilho, { from, to, startMs, endMs }. playSeconds: quantos segundos a
+   missão inteira leva tocando. speed: a velocidade escolhida (1, 2 ou 4). */
+export function timeWarp({ from, to, startMs, endMs }, playSeconds, speed) {
+  const screenSeconds = ((to - from) * playSeconds) / speed
+  return (endMs - startMs) / 1000 / screenSeconds
+}
+

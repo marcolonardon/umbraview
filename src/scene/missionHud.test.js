@@ -4,7 +4,8 @@
  * sem React, para serem testadas no Node. */
 import { describe, expect, it } from 'vitest'
 
-import { arcPath, arcPoint, gaugeArc, gaugeScale } from './missionHud.js'
+import { MOON_RADIUS_M } from '../engine/geometry.js'
+import { arcPath, arcPoint, gaugeArc, gaugeScale, moonDistanceKm, timeWarp } from './missionHud.js'
 
 const ARCO = { width: 600, sag: 40 }
 
@@ -76,6 +77,49 @@ describe('a escala automática do mostrador (gaugeScale)', () => {
   it('zero ou nada não quebra: a menor escala, e o mostrador apagado', () => {
     expect(gaugeScale(0)).toBe(1)
     expect(gaugeArc(0, gaugeScale(0))).toBe(0)
+  })
+})
+
+/* O terceiro mostrador (pedido pelo Marco em 19/11/2026): a distância da nave até o chão da Lua. Ele
+   anda o tempo todo, também na órbita de espera, onde a altura e a velocidade ficam paradas. */
+describe('a distância até a Lua (moonDistanceKm)', () => {
+  const RAIO_DA_LUA_KM = MOON_RADIUS_M / 1000
+
+  it('contada da Terra, é a distância entre a nave e o centro da Lua, menos o raio dela', () => {
+    const nave = { center: 'earth', positionKm: [7000, 0, 0] }
+    const lua = [7000, 300000, 400000]
+    expect(moonDistanceKm(nave, lua)).toBeCloseTo(500000 - RAIO_DA_LUA_KM, 6)
+  })
+
+  it('contada da Lua, é a distância até o centro dela, menos o raio: a altura sobre a Lua', () => {
+    const nave = { center: 'moon', positionKm: [0, RAIO_DA_LUA_KM + 100, 0] }
+    expect(moonDistanceKm(nave, [384400, 0, 0])).toBeCloseTo(100, 6)
+  })
+
+  it('no chão, nunca negativa', () => {
+    expect(moonDistanceKm({ center: 'moon', positionKm: [RAIO_DA_LUA_KM - 2, 0, 0] }, [0, 0, 0])).toBe(0)
+  })
+})
+
+/* Quanto o tempo da missão anda por segundo de tela, em cada fase (pedido pelo Marco em
+   19/11/2026): o trilho dá a cada fase um pedaço pelo peso dela, e não pelo tempo, então a aceleração
+   muda de uma fase para outra. */
+describe('a aceleração do tempo (timeWarp)', () => {
+  const HORA = 3600e3
+  // uma fase de 50 minutos que ocupa um nono do trilho, numa missão tocada em 45 segundos
+  const pedaco = { from: 1 / 9, to: 2 / 9, startMs: 0, endMs: 50 * 60e3 }
+
+  it('é o tempo da fase sobre os segundos de tela dela: 3000 s em 5 s dão 600 vezes', () => {
+    expect(timeWarp(pedaco, 45, 1)).toBeCloseTo(600, 6)
+  })
+
+  it('a velocidade de tocar multiplica a aceleração', () => {
+    expect(timeWarp(pedaco, 45, 4)).toBeCloseTo(2400, 6)
+  })
+
+  it('uma travessia de 4 dias em três nonos do trilho anda dezenas de milhares de vezes', () => {
+    const travessia = { from: 2 / 9, to: 5 / 9, startMs: 0, endMs: 96 * HORA }
+    expect(timeWarp(travessia, 45, 1)).toBeCloseTo((96 * 3600) / 15, 6)
   })
 })
 

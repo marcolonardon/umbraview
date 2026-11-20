@@ -39,6 +39,7 @@ import { LandingAreasLayer } from './LandingAreasLayer.jsx'
 import { sunSideStart } from './framing.js'
 import { LAUNCH_STEP, MissionControl } from './MissionControl.jsx'
 import { MissionComplete, MissionHud, TRACK_STEPS } from './MissionFlight.jsx'
+import { moonDistanceKm, timeWarp } from './missionHud.js'
 import { mapPoint, missionMap } from './missionMap.js'
 import { MissionMap } from './MissionMap.jsx'
 import {
@@ -64,8 +65,8 @@ const HOUR_MS = 3600e3
    pouso, 5 segundos cada; a travessia, 15). Andando pelo tempo, a 2 horas por segundo, a subida
    passava em um décimo de segundo. */
 const MISSION_PLAY_SECONDS = 45
-// a velocidade rápida: a missão inteira em 11 segundos, para quem quer ver de novo
-const FAST_FACTOR = 4
+/* As velocidades de tocar, sobre o ritmo normal: a missão inteira em 45, 22 ou 11 segundos. */
+const PLAYBACK_SPEEDS = Object.freeze([1, 2, 4])
 // quanto da cor fica na parte da linha que a nave ainda não voou
 const REMAINING_OPACITY = 0.3
 
@@ -653,14 +654,16 @@ export function MissionView({
      Tocando, ele para no fim do trilho, que é o pouso, em vez de voltar ao lançamento; e volta ao
      começo, parado, quando a missão troca. */
   const missionStartMs = mission ? mission.launchUtc.getTime() : null
-  const [fast, setFast] = useState(false)
+  const [speed, setSpeed] = useState(PLAYBACK_SPEEDS[0])
   // voando, a câmera se põe sozinha, a não ser que a pessoa a solte
   const [freeCamera, setFreeCamera] = useState(false)
   // o mapa pequeno do voo, oculto pela pessoa: vale para os próximos lançamentos também
   const [mapHidden, setMapHidden] = useState(false)
+  // o mapa aumentado, também escolha da pessoa, que vale para os próximos lançamentos
+  const [mapLarge, setMapLarge] = useState(false)
   const clock = useViewClock(
     TRACK_STEPS + 1,
-    (TRACK_STEPS / MISSION_PLAY_SECONDS) * (fast ? FAST_FACTOR : 1),
+    (TRACK_STEPS / MISSION_PLAY_SECONDS) * speed,
     missionStartMs ?? 'period',
     TRACK_STEPS,
   )
@@ -941,12 +944,16 @@ export function MissionView({
               phase={craft.phase}
               elapsedHours={elapsedHours}
               telemetry={telemetry}
+              moonDistanceKm={telemetry.kind === 'schematic' ? null : moonDistanceKm(craft, state.moonKm)}
               next={hudNext}
+              summary={complete ? <MissionComplete mission={mission} onRelaunch={launch} /> : null}
               missionName={missionView.hudMission(landingSite.name ?? missionView.customLandingSite, launchSite.name)}
               playing={clock.playing}
               onTogglePlay={() => clock.setPlaying((value) => !value)}
-              fast={fast}
-              onToggleFast={() => setFast((value) => !value)}
+              speeds={PLAYBACK_SPEEDS}
+              speed={speed}
+              onSpeedChange={setSpeed}
+              warp={timeWarp(layout.find((piece) => piece.phase === craft.phase), MISSION_PLAY_SECONDS, speed)}
               onSeek={(position) => clock.seek(position * TRACK_STEPS)}
               freeCamera={freeCamera}
               onToggleFreeCamera={() => setFreeCamera((value) => !value)}
@@ -961,11 +968,11 @@ export function MissionView({
               dateMs={dateMs}
               hidden={mapHidden}
               onToggle={() => setMapHidden((value) => !value)}
+              large={mapLarge}
+              onToggleSize={() => setMapLarge((value) => !value)}
             />
           )}
         </div>
-        {/* O resumo do pouso, por cima da cena, no canto onde ficava o cartão do lançamento. */}
-        {complete && <MissionComplete mission={mission} onRelaunch={launch} />}
         {/* À mão sempre que há missão: uma linha com cara de precisa convida a ler "foi assim que
             a IM-2 voou" (plano, "Risks"). O texto abre no clique, para não ficar em cima da cena. */}
         {mission && (

@@ -551,6 +551,22 @@ describe('MissionView: voando', () => {
     expect(screen.getByText(missionView.mapCaption)).toBeInTheDocument()
   })
 
+  /* O mapa tem dois botões só de ícone, com o nome para o leitor de tela (pedido pelo Marco em
+     19/11/2026): um aumenta e diminui o mapa, o outro oculta e mostra. */
+  it('o mapa aumenta e diminui por um botão de ícone, sem texto na tela', () => {
+    voar()
+    const aumentar = screen.getByRole('button', { name: missionView.mapExpand })
+    expect(aumentar).toHaveTextContent('')
+    expect(aumentar).toHaveAttribute('aria-pressed', 'false')
+    fireEvent.click(aumentar)
+    const diminuir = screen.getByRole('button', { name: missionView.mapShrink })
+    expect(diminuir).toHaveAttribute('aria-pressed', 'true')
+    expect(screen.getByRole('img', { name: missionView.mapLabel }).closest('.mission-map')).toHaveAttribute('data-size', 'large')
+    fireEvent.click(diminuir)
+    expect(screen.getByRole('img', { name: missionView.mapLabel }).closest('.mission-map')).toHaveAttribute('data-size', 'small')
+    expect(screen.getByRole('button', { name: missionView.mapHide })).toHaveTextContent('')
+  })
+
   /* O mapa cobre um canto da cena: dá para ocultá-lo, e um botão pequeno continua lá para trazê-lo
      de volta (visto pelo Marco em 19/11/2026, que pediu para poder esconder). */
   it('um botão oculta o mapa e outro o traz de volta, e a escolha vale para o próximo lançamento', () => {
@@ -569,12 +585,34 @@ describe('MissionView: voando', () => {
     expect(screen.getByRole('img', { name: missionView.mapLabel })).toBeInTheDocument()
   })
 
-  it('a velocidade tem dois valores, e o botão dela diz qual está ligado', () => {
+  /* A velocidade de tocar é um seletor de três valores, e não um botão "4× speed" sozinho, que não
+     dizia em relação a quê (pedido pelo Marco em 19/11/2026). */
+  it('a velocidade de tocar tem três valores, 1×, 2× e 4×, e só um fica ligado', () => {
     voar()
-    const rapido = screen.getByRole('button', { name: missionView.fastLabel })
-    expect(rapido).toHaveAttribute('aria-pressed', 'false')
-    fireEvent.click(rapido)
-    expect(rapido).toHaveAttribute('aria-pressed', 'true')
+    const grupo = screen.getByRole('group', { name: missionView.playbackLabel })
+    const botoes = within(grupo).getAllByRole('button')
+    expect(botoes.map((botao) => botao.textContent)).toEqual(['1×', '2×', '4×'])
+    expect(botoes.map((botao) => botao.getAttribute('aria-pressed'))).toEqual(['true', 'false', 'false'])
+    fireEvent.click(botoes[2])
+    expect(botoes.map((botao) => botao.getAttribute('aria-pressed'))).toEqual(['false', 'false', 'true'])
+  })
+
+  /* Quanto o tempo da missão anda por segundo de tela, em cada fase (timeWarp): o trilho dá a cada
+     fase um pedaço pelo peso dela, e a aceleração muda de uma fase para outra. Na missão de teste, a
+     órbita de espera tem 50 minutos num nono do trilho de 45 segundos: 3000 s em 5 s, 600 vezes. */
+  it('embaixo do relógio, quanto o tempo está acelerado agora, e quanto vale um segundo de tela', () => {
+    voar()
+    irPara(150)
+    const acelerado = () => screen.getByText(missionView.hudWarpLabel).closest('.mission-hud__warp')
+    expect(acelerado()).toHaveTextContent(missionView.hudWarpValue('600'))
+    expect(acelerado()).toHaveTextContent(missionView.hudWarpSecond('10 min'))
+    fireEvent.click(screen.getByRole('button', { name: '4×' }))
+    expect(acelerado()).toHaveTextContent(missionView.hudWarpValue('2,400'))
+    expect(acelerado()).toHaveTextContent(missionView.hudWarpSecond('40 min'))
+    // na travessia, 96 horas em três nonos do trilho: muito mais acelerado
+    fireEvent.click(screen.getByRole('button', { name: '1×' }))
+    irPara(300)
+    expect(acelerado()).toHaveTextContent(missionView.hudWarpValue('23,040'))
   })
 
   /* O trilho não é uma régua de tempo: cada fase tem o seu pedaço. Os pesos são 1, 1, 3, 2, 1 e 1,
@@ -645,14 +683,37 @@ describe('MissionView: voando', () => {
     expect(screen.getByText(missionView.phaseNotes.lunarOrbit)).toBeInTheDocument()
   })
 
-  it('os mostradores da velocidade e da altura mostram o número do cartão, e somem nos trechos desenhados', () => {
+  /* Os mostradores só aparecem quando há número de verdade (pedido pelo Marco em 19/11/2026): nos
+     trechos desenhados, a subida e o pouso final, a telemetria sai da tela, em vez de mostrar "—". */
+  const leitura = (rotulo) => screen.getByText(rotulo).closest('.mission-hud__readout')
+
+  /* O instrumento fica sempre à vista (o Marco preferiu assim, em 19/11/2026): nos trechos
+     desenhados, a subida e o pouso final, os números viram "—" e os anéis apagam. */
+  it('os mostradores mostram o número do cartão, e "—" nos trechos desenhados, sem sair da tela', () => {
     voar()
     irPara(200)
-    const mostrador = (rotulo) => screen.getByText(rotulo).closest('.mission-hud__gauge')
-    expect(mostrador(missionView.gaugeSpeed)).toHaveTextContent('0.03')
-    expect(mostrador(missionView.gaugeAltitude)).toHaveTextContent('622')
+    expect(leitura(missionView.gaugeSpeed)).toHaveTextContent('0.03')
+    expect(leitura(missionView.gaugeAltitude)).toHaveTextContent('622')
     irPara(50)
-    expect(mostrador(missionView.gaugeSpeed)).toHaveTextContent(missionView.gaugeNone)
+    for (const rotulo of [missionView.gaugeSpeed, missionView.gaugeAltitude, missionView.gaugeMoon]) {
+      expect(leitura(rotulo)).toHaveTextContent(missionView.gaugeNone)
+    }
+    expect(screen.getByText(missionView.hudTelemetry)).toBeInTheDocument()
+    irPara(850)
+    expect(leitura(missionView.gaugeAltitude)).toHaveTextContent(missionView.gaugeNone)
+  })
+
+  /* O terceiro mostrador: a distância até a Lua. Na órbita de espera a altura e a velocidade ficam
+     paradas, e ela anda. */
+  it('o terceiro mostrador é a distância até a Lua, e ele anda na órbita de espera', () => {
+    voar()
+    irPara(110)
+    const antes = leitura(missionView.gaugeMoon).textContent
+    expect(antes).toMatch(/\d/)
+    irPara(190)
+    expect(leitura(missionView.gaugeMoon).textContent).not.toBe(antes)
+    // e o leitor de tela ouve a distância junto com os outros números
+    expect(screen.getByRole('group', { name: missionView.flightStatus })).toHaveTextContent('km from the Moon')
   })
 
   /* Na órbita de espera a nave anda em círculo: a altura e a velocidade não mudam, e o painel
@@ -673,7 +734,7 @@ describe('MissionView: voando', () => {
      no máximo da missão, a altura da órbita de espera não acendia nada (visto pelo Marco). */
   it('cada mostrador diz a escala em que está, e ela acompanha o valor', () => {
     voar()
-    const mostrador = (rotulo) => screen.getByText(rotulo).closest('.mission-hud__gauge')
+    const mostrador = (rotulo) => screen.getByText(rotulo).closest('.mission-hud__readout')
     irPara(200)
     // 622 km sobre a Terra e 0,03 km/s: as escalas de 1.000 km e de 0,05 km/s
     expect(mostrador(missionView.gaugeAltitude)).toHaveTextContent(missionView.gaugeScaleText('1,000'))
@@ -706,6 +767,16 @@ describe('MissionView: voando', () => {
     expect(total(missionView.totalTime)).toBe('4 d 14 h')
     expect(total(missionView.totalDeltaV)).toBe('4.00 km/s')
     expect(voo()).toHaveTextContent('T+ 4 d 14 h')
+  })
+
+  /* O resumo fica dentro da faixa de baixo, no lugar da frase da fase: solto por cima da cena, ele
+     cobria o mapa do caminho numa tela mais baixa (visto pelo Marco em 19/11/2026). */
+  it('o resumo do pouso fica na faixa do painel de voo, no lugar da frase da fase', () => {
+    voar()
+    irPara(900)
+    const resumo = screen.getByRole('region', { name: missionView.completeTitle })
+    expect(resumo.closest('.mission-hud')).not.toBeNull()
+    expect(screen.queryByText(missionView.phaseNotes.landing)).not.toBeInTheDocument()
   })
 
   it('do resumo dá para lançar de novo: o trilho volta ao começo, tocando', () => {

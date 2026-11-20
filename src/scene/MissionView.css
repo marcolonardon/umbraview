@@ -31,15 +31,6 @@
   background: var(--color-bg);
 }
 
-/* O resumo do pouso, por cima da cena: embaixo dela, empurrava a página para além da tela. */
-.mission-view__stage > .mission-complete {
-  position: absolute;
-  right: var(--space-3);
-  bottom: var(--space-3);
-  z-index: var(--z-panel);
-  max-width: calc(var(--panel-width) * 0.9);
-  background: var(--color-surface);
-}
 
 /* O selo de que é uma missão de referência, no canto de baixo da cena; o texto abre no clique. */
 .mission-view__badge {
@@ -85,8 +76,7 @@
     max-width: calc(100% - var(--panel-width) * 0.28 - var(--space-8));
   }
 
-  .mission-view__badge,
-  .mission-view__stage > .mission-complete {
+  .mission-view__badge {
     position: static;
     max-width: none;
     margin-top: var(--space-2);
@@ -143,11 +133,11 @@
   transform: translateY(calc(-1 * var(--space-5)));
 }
 
-/* Voando, a faixa do painel de voo (MissionHud) ocupa a parte de baixo da cena: o selo e o resumo do
-   pouso sobem para cima dela. No celular a faixa fica embaixo da cena, e eles também. */
+/* Voando, a faixa do painel de voo (MissionHud) ocupa a parte de baixo da cena: o selo sobe para cima
+   dela. No celular a faixa fica embaixo da cena, e ele também. O resumo do pouso fica dentro da
+   faixa (MissionFlight.jsx). */
 @media (min-width: 601px) {
-  .mission-view__stage--flying > .mission-view__badge,
-  .mission-view__stage--flying > .mission-complete {
+  .mission-view__stage--flying > .mission-view__badge {
     bottom: var(--hud-clearance);
   }
 }

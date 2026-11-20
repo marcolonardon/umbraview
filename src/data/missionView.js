@@ -116,17 +116,27 @@ export const missionView = {
   progressLabel: 'Mission progress',
   // o que o leitor de tela ouve no trilho: a fase e o tempo de missão
   progressValue: (phase, elapsed) => `${phase}, T+ ${elapsed}`,
-  // a velocidade rápida de tocar
-  fastLabel: '4× speed',
+  /* A velocidade de tocar: um seletor de três valores, sobre o ritmo normal, em que a missão inteira
+     leva 45 segundos. O botão "4× speed" sozinho não dizia em relação a quê (Marco, 19/11/2026). */
+  playbackLabel: 'Playback speed',
+  playbackOption: (factor) => `${factor}×`,
+  /* Quanto o tempo da missão está acelerado agora, e quanto tempo um segundo de tela vale: muda de
+     uma fase para outra, porque cada fase tem no trilho um pedaço pelo peso dela (timeWarp). */
+  hudWarpLabel: 'Time warp',
+  hudWarpValue: (factor) => `×${factor}`,
+  hudWarpSecond: (duration) => `1 s = ${duration}`,
   // voando, a câmera se põe sozinha; este botão a solta, para a pessoa girar e aproximar
   freeCamera: 'Free camera',
   // o mapa pequeno do trajeto inteiro, no canto da cena
   mapLabel:
     'Map of the whole path of the mission, seen from above: the Earth, the orbit of the Moon, the Moon, the crossing and the spacecraft.',
   mapCaption: 'Whole path, to scale. The Moon and the spacecraft are dots.',
-  // o botão do mapa: ele cobre um canto da cena, e dá para ocultá-lo
-  mapHide: 'Hide map',
-  mapShow: 'Show map',
+  /* Os botões do mapa, só de ícone: estes são os nomes deles para o leitor de tela e para a dica do
+     mouse. Um aumenta e diminui o mapa; o outro minimiza e restaura. */
+  mapHide: 'Minimize map',
+  mapShow: 'Restore map',
+  mapExpand: 'Expand map',
+  mapShrink: 'Shrink map',
   // a legenda do trilho: os nomes das fases, embaixo dele
   timelineLabel: 'Mission phases',
   // o cartão de voo: a fase, o tempo de missão e a nave em números
@@ -144,14 +154,18 @@ export const missionView = {
   gaugeSpeed: 'Velocity',
   gaugeSpeedUnit: 'km/s',
   gaugeAltitude: 'Altitude',
-  // a unidade e o corpo de onde a altura é contada, curtos: cabem dentro do mostrador
-  gaugeAltitudeUnit: (body) => (body === 'moon' ? 'km · Moon' : 'km · Earth'),
-  // nos trechos desenhados o mostrador não tem número
-  gaugeNone: '—',
+  // o terceiro anel: a distância até o chão da Lua, que anda também na órbita de espera
+  gaugeMoon: 'To the Moon',
+  gaugeMoonUnit: 'km',
+  moonDistanceValue: (km) => `${Math.round(km).toLocaleString('en-US')} km from the Moon`,
+  // a unidade e o corpo de onde a altura é contada
+  gaugeAltitudeUnit: (body) => (body === 'moon' ? 'km above the Moon' : 'km above the Earth'),
   /* O próximo evento e quanto falta para ele: na órbita de espera e na lunar a altura e a velocidade
      não mudam (a órbita é um círculo), e a contagem é o que anda no painel. */
   hudNext: 'Next',
   hudCountdown: (remaining) => `T− ${remaining}`,
+  // nos trechos desenhados o instrumento fica à vista, sem número
+  gaugeNone: '—',
   // a escala em que o mostrador está agora, que acompanha o valor (gaugeScale)
   gaugeScaleText: (scale) => `0–${scale}`,
   // a fase de agora, em uma frase: o que a nave está fazendo, pelo modelo da missão (src/engine/mission.js)

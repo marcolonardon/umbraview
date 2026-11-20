@@ -14,7 +14,7 @@
 import { useId } from 'react'
 
 import { missionView } from '../data/missionView.js'
-import { formatElapsed } from '../panel/format.js'
+import { formatDuration, formatElapsed } from '../panel/format.js'
 import { arcPath, arcPoint, gaugeArc, gaugeScale } from './missionHud.js'
 import './MissionControl.css'
 
@@ -30,81 +30,116 @@ const ARC_TOP = 22
 // o arco inteiro, feito uma vez: a parte voada é ele mesmo, aceso pelo tracejado
 const ARC_PATH = arcPath(0, 1, ARC, 96)
 const ARC_HEIGHT = ARC_TOP + ARC.sag + 26
-// o mostrador redondo: o raio e quanto da volta ele ocupa (três quartos, aberto embaixo)
-const GAUGE_RADIUS = 30
-const GAUGE_SWEEP = 0.75
-const GAUGE_LENGTH = 2 * Math.PI * GAUGE_RADIUS * GAUGE_SWEEP
+/* O instrumento da telemetria: três anéis, um dentro do outro, cada um aceso pela fração do valor na
+   escala dele (gaugeArc e gaugeScale). Os anéis ocupam três quartos da volta, começando em cima. Um
+   instrumento só, e não um mostrador por número: a primeira versão tinha dois mostradores redondos
+   lado a lado, e o Marco achou parecido demais com a referência (19/11/2026). Os raios, de fora para
+   dentro, e a espessura, em unidades do desenho: */
+const RING_RADII = [42, 32, 22]
+const RING_WIDTH = 6
+const RING_SWEEP = 0.75
 
-/* Um mostrador redondo da nave: o rótulo, o número no meio, a unidade embaixo, a escala em que ele
-   está e o arco aceso pela fração dela (gaugeArc). A escala acompanha o valor (gaugeScale), em
-   degraus de 1, 2 e 5 vezes uma potência de dez. value: o número já em texto, ou null nos trechos
-   desenhados. scale: a escala, já em texto. É desenho: os mesmos números estão no cartão de voo, que
-   o leitor de tela lê. */
-function Gauge({ label, value, unit, fraction, scale }) {
+/* Os três anéis. readings: [{ key, fraction }], de fora para dentro. É desenho: os números estão na
+   legenda ao lado e no cartão de voo, que o leitor de tela lê. */
+function TelemetryRings({ readings }) {
   return (
-    <div className="mission-hud__gauge">
-      <svg className="mission-hud__gauge-dial" viewBox="-40 -40 80 80" aria-hidden="true">
-        <circle
-          className="mission-hud__gauge-track"
-          r={GAUGE_RADIUS}
-          strokeDasharray={`${GAUGE_LENGTH} 1000`}
-          transform="rotate(135)"
-        />
-        <circle
-          className="mission-hud__gauge-fill"
-          r={GAUGE_RADIUS}
-          strokeDasharray={`${GAUGE_LENGTH * (value === null ? 0 : fraction)} 1000`}
-          transform="rotate(135)"
-        />
-      </svg>
-      <span className="mission-hud__gauge-label">{label}</span>
-      <span className="mission-hud__gauge-value">{value ?? missionView.gaugeNone}</span>
-      <span className="mission-hud__gauge-unit">{unit}</span>
-      {value !== null && <span className="mission-hud__gauge-scale">{missionView.gaugeScaleText(scale)}</span>}
+    <svg className="mission-hud__rings" viewBox="-50 -50 100 100" aria-hidden="true">
+      {readings.map(({ key, fraction }, i) => {
+        const length = 2 * Math.PI * RING_RADII[i] * RING_SWEEP
+        return (
+          <g key={key} className={`mission-hud__ring mission-hud__ring--${key}`} transform="rotate(-90)">
+            <circle className="mission-hud__ring-track" r={RING_RADII[i]} strokeWidth={RING_WIDTH} strokeDasharray={`${length} 1000`} />
+            <circle className="mission-hud__ring-fill" r={RING_RADII[i]} strokeWidth={RING_WIDTH} strokeDasharray={`${length * fraction} 1000`} />
+          </g>
+        )
+      })}
+    </svg>
+  )
+}
+
+/* Uma linha da legenda: a cor do anel, o rótulo, o número, a unidade e a escala em que o anel está.
+   value: o número já em texto, ou null nos trechos desenhados, que mostram "—" e nenhuma escala. */
+function Readout({ ring, label, value, unit, scale }) {
+  return (
+    <div className={`mission-hud__readout mission-hud__readout--${ring}`}>
+      <span className="mission-hud__readout-label">{label}</span>
+      <span className="mission-hud__readout-value">
+        {value ?? missionView.gaugeNone} <span className="mission-hud__readout-unit">{unit}</span>
+      </span>
+      {value !== null && <span className="mission-hud__readout-scale">{missionView.gaugeScaleText(scale)}</span>}
     </div>
   )
 }
 
 /* O painel de voo em estilo de transmissão (pedido pelo Marco em 19/11/2026, inspirado nas
    transmissões de lançamento), numa faixa embaixo da cena. Substitui o cartão de voo e o trilho reto:
-   - à esquerda, dois mostradores redondos, a velocidade e a altura;
+   - à esquerda, a telemetria: três anéis, um dentro do outro, e a legenda com os números (a
+     distância até a Lua, a altura e a velocidade), só quando há número de verdade;
    - no meio, o arco da missão, um ponto por fase, com a parte voada acesa, e embaixo dele o tempo de
      missão grande e o nome da missão. Por cima do arco fica um controle deslizante comum, invisível,
      que é quem anda com o mouse, as setas e o leitor de tela: o x do arco anda por igual com o lugar
      no trilho (arcPoint), então os dois apontam o mesmo lugar;
    - à direita, a fase de agora e uma frase sobre ela, e os botões de tocar, da velocidade e da câmera.
    layout, position, phase, elapsedHours: os pedaços do trilho, o lugar nele (de 0 a 1), a fase e o
-   tempo de missão. telemetry: a nave em números (telemetryAt). next: o próximo evento,
-   { name, remainingHours }, ou null depois do pouso. missionName: o local de pouso e a base, já em texto. playing, fast e freeCamera,
-   com os on*: os três botões. onSeek: chamada com o lugar do trilho, de 0 a 1. focusTarget: a ref do
+   tempo de missão. telemetry: a nave em números (telemetryAt). moonDistanceKm: a distância da nave
+   até o chão da Lua (moonDistanceKm, em missionHud.js), ou null nos trechos desenhados. next: o próximo evento,
+   { name, remainingHours }, ou null depois do pouso. missionName: o local de pouso e a base, já em
+   texto. playing e freeCamera, com os on*: os botões de tocar e da câmera. speeds, speed e
+   onSpeedChange: o seletor da velocidade de tocar. warp: quantas vezes mais rápido que o tempo de
+   verdade a missão anda na fase de agora (timeWarp). summary: o resumo do pouso (MissionComplete),
+   ou null antes dele; no pouso ele fica embaixo do relógio, e a frase da fase e a contagem saem. onSeek: chamada com o lugar do trilho, de 0 a 1. focusTarget: a ref do
    botão de tocar, para onde o foco vai quando o Launch sai da página (useKeepFocus). */
 export function MissionHud({
-  layout, position, phase, elapsedHours, telemetry, next = null, missionName,
-  playing, onTogglePlay, fast, onToggleFast, onSeek, freeCamera, onToggleFreeCamera, focusTarget,
+  layout, position, phase, elapsedHours, telemetry, moonDistanceKm = null, next = null, missionName, summary = null,
+  playing, onTogglePlay, speeds, speed, onSpeedChange, warp, onSeek, freeCamera, onToggleFreeCamera, focusTarget,
 }) {
   const drawn = telemetry.kind === 'schematic'
   const flownTo = Math.max(0, Math.min(1, position))
   const [craftX, craftY] = arcPoint(flownTo, ARC)
   const speedScale = gaugeScale(telemetry.speedKmS)
   const altitudeScale = gaugeScale(telemetry.altitudeKm)
+  const moonDistance = moonDistanceKm ?? 0
+  const moonScale = gaugeScale(moonDistance)
   return (
     <div className="mission-hud">
-      <div className="mission-hud__gauges" aria-hidden="true">
-        <Gauge
-          label={missionView.gaugeSpeed}
-          value={drawn ? null : telemetry.speedKmS.toFixed(2)}
-          unit={missionView.gaugeSpeedUnit}
-          fraction={gaugeArc(telemetry.speedKmS, speedScale)}
-          scale={speedScale.toLocaleString('en-US')}
-        />
-        <Gauge
-          label={missionView.gaugeAltitude}
-          value={drawn ? null : Math.round(telemetry.altitudeKm).toLocaleString('en-US')}
-          unit={missionView.gaugeAltitudeUnit(telemetry.body)}
-          fraction={gaugeArc(telemetry.altitudeKm, altitudeScale)}
-          scale={altitudeScale.toLocaleString('en-US')}
-        />
-        <span className="mission-hud__caption">{missionView.hudTelemetry}</span>
+      {/* A telemetria fica sempre à vista; nos trechos desenhados (a subida e o pouso final), sem
+          número: os anéis apagam e a legenda diz "—" (o Marco preferiu assim, em 19/11/2026). */}
+      <div className="mission-hud__telemetry" aria-hidden="true">
+        <>
+            <span className="mission-hud__caption">{missionView.hudTelemetry}</span>
+            <div className="mission-hud__instrument">
+              <TelemetryRings
+                readings={[
+                  { key: 'moon', fraction: drawn ? 0 : gaugeArc(moonDistance, moonScale) },
+                  { key: 'altitude', fraction: drawn ? 0 : gaugeArc(telemetry.altitudeKm, altitudeScale) },
+                  { key: 'speed', fraction: drawn ? 0 : gaugeArc(telemetry.speedKmS, speedScale) },
+                ]}
+              />
+              <div className="mission-hud__readouts">
+                <Readout
+                  ring="moon"
+                  label={missionView.gaugeMoon}
+                  value={drawn ? null : Math.round(moonDistance).toLocaleString('en-US')}
+                  unit={missionView.gaugeMoonUnit}
+                  scale={moonScale.toLocaleString('en-US')}
+                />
+                <Readout
+                  ring="altitude"
+                  label={missionView.gaugeAltitude}
+                  value={drawn ? null : Math.round(telemetry.altitudeKm).toLocaleString('en-US')}
+                  unit={missionView.gaugeAltitudeUnit(telemetry.body)}
+                  scale={altitudeScale.toLocaleString('en-US')}
+                />
+                <Readout
+                  ring="speed"
+                  label={missionView.gaugeSpeed}
+                  value={drawn ? null : telemetry.speedKmS.toFixed(2)}
+                  unit={missionView.gaugeSpeedUnit}
+                  scale={speedScale.toLocaleString('en-US')}
+                />
+              </div>
+            </div>
+        </>
       </div>
 
       <div className="mission-hud__center">
@@ -159,30 +194,54 @@ export function MissionHud({
           <span className="mission-hud__hidden">{missionView.phaseNames[telemetry.phase]}</span>
           <span className="mission-hud__time">{missionView.elapsedValue(formatElapsed(elapsedHours))}</span>
           <span className="mission-hud__hidden">
-            {drawn ? missionView.drawnValue : missionView.telemetryValue(telemetry.altitudeKm, telemetry.body, telemetry.speedKmS)}
+            {drawn
+              ? missionView.drawnValue
+              : `${missionView.telemetryValue(telemetry.altitudeKm, telemetry.body, telemetry.speedKmS)} · ${missionView.moonDistanceValue(moonDistance)}`}
           </span>
         </div>
+        {/* Quanto o tempo está acelerado agora: muda de fase para fase, e com a velocidade de tocar. */}
+        <p className="mission-hud__warp">
+          <span className="mission-hud__warp-label">{missionView.hudWarpLabel}</span>{' '}
+          <span className="mission-hud__warp-value">{missionView.hudWarpValue(Math.round(warp).toLocaleString('en-US'))}</span>{' '}
+          <span className="mission-hud__warp-second">{missionView.hudWarpSecond(formatDuration(warp / 3600))}</span>
+        </p>
         <span className="mission-hud__mission">{missionName}</span>
+        {/* No pouso, o resumo fica aqui, numa linha, embaixo do relógio: solto por cima da cena ele
+            cobria o mapa do caminho, e na coluna da direita, estreita, ficava alto demais numa tela de
+            720 px (vistos pelo Marco e num Chrome sem janela, em 19/11/2026). */}
+        {summary}
       </div>
 
       <div className="mission-hud__side">
         <span className="mission-hud__event-title">{missionView.phaseNames[phase]}</span>
-        <p className="mission-hud__event-note">{missionView.phaseNotes[phase]}</p>
+        {/* no pouso a frase da fase dá lugar ao resumo, embaixo do relógio */}
+        {!summary && <p className="mission-hud__event-note">{missionView.phaseNotes[phase]}</p>}
         {/* A contagem até o próximo evento: na órbita de espera e na lunar os mostradores ficam
             parados, porque a órbita é um círculo, e o painel parecia travado (visto pelo Marco). */}
-        {next && (
+        {!summary && next && (
           <p className="mission-hud__next">
             <span className="mission-hud__next-label">{missionView.hudNext}</span>{' '}
             <span className="mission-hud__next-name">{next.name}</span>{' '}
             <span className="mission-hud__next-time">{missionView.hudCountdown(formatElapsed(next.remainingHours))}</span>
           </p>
         )}
+        {/* A velocidade de tocar: três botões, um ligado de cada vez, sobre o ritmo normal. */}
+        <div className="mission-hud__speeds" role="group" aria-label={missionView.playbackLabel}>
+          {speeds.map((value) => (
+            <button
+              key={value}
+              className="mission-hud__speed"
+              type="button"
+              aria-pressed={speed === value}
+              onClick={() => onSpeedChange(value)}
+            >
+              {missionView.playbackOption(value)}
+            </button>
+          ))}
+        </div>
         <div className="mission-hud__buttons">
           <button ref={focusTarget} className="mission-hud__button" type="button" aria-pressed={playing} onClick={onTogglePlay}>
             {playing ? missionView.pause : missionView.play}
-          </button>
-          <button className="mission-hud__button" type="button" aria-pressed={fast} onClick={onToggleFast}>
-            {missionView.fastLabel}
           </button>
           <button className="mission-hud__button" type="button" aria-pressed={freeCamera} onClick={onToggleFreeCamera}>
             {missionView.freeCamera}
