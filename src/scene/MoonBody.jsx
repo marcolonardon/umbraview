@@ -7,6 +7,7 @@ import { useFarRelief } from '../hooks/useFarRelief.js'
 import { token } from './cssToken.js'
 import { bodyLandingShader } from './moonGlobe.js'
 import { moonImagesOfPage } from './moonImages.js'
+import { MoonNorthCap } from './MoonNorthCap.jsx'
 import { MoonSouthCap } from './MoonSouthCap.jsx'
 import { useBodyTexture } from './useBodyTexture.js'
 
@@ -35,7 +36,8 @@ const NO_RAYCAST = () => null
      - o mapa de normais da Lua inteira (a mesma imagem da cena principal): as crateras fazem
        sombra com o Sol;
      - no polo sul, a malha do relevo e a imagem polar (MoonSouthCap.jsx), por cima da esfera:
-       nas imagens de latitude e longitude o polo sai em raios;
+       nas imagens de latitude e longitude o polo sai em raios; no polo norte, uma malha com as
+       imagens da esfera refeitas na projeção do polo (MoonNorthCap.jsx);
      - uma esfera de clique, simples e que não aparece: o raio do mouse é testado contra os
        triângulos de quem ouve o mouse a cada movimento dele, e os da Lua com relevo são muitos;
      - o mapa de onde dá para pousar (card C18), no shader da esfera e da malha do polo
@@ -65,6 +67,8 @@ export function MoonBody({ radius, matrix, onClick, onPointerOver, onPointerOut,
         />
       </mesh>
       {farRelief && <MoonSouthCap relief={farRelief} radius={radius} />}
+      {/* o polo norte também, com a imagem refeita no navegador (MoonNorthCap.jsx): sem ela, raios */}
+      {relief && <MoonNorthCap radius={radius} />}
       {relief && (
         <mesh {...handlers}>
           <sphereGeometry args={[radius, ...SEGMENTS]} />

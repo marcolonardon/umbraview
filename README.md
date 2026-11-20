@@ -430,6 +430,7 @@ umbraview/
 │   │   ├── MissionView.css
 │   │   ├── MissionView.jsx          the mission view: the Earth and the Moon to scale, with the launch sites on the Earth (card C13)
 │   │   ├── MoonGlobe.jsx            the whole-Moon sphere, with its real color and terrain
+│   │   ├── MoonNorthCap.jsx         the north pole of the Moon in the mission view: a mesh of its own with the images of the sphere redone in the projection of the pole
 │   │   ├── MoonSouthCap.jsx         the south pole of the Moon in the mission view: the relief mesh of the pole with the polar color image (card C17)
 │   │   ├── NearRelief.jsx           the close-up fine terrain, only where the machine can handle it (card C6)
 │   │   ├── ReliefCap.jsx            the south pole terrain in the scene, with shadows (card C2)

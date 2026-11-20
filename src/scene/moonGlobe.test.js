@@ -7,7 +7,7 @@ import { latLonToUnit, unitToPolarXY } from '../engine/geometry.js'
 import { latLonToScene } from './coordinates.js'
 import {
   applySouthColor, bodyLandingShader, globalLandingShader, globeTextureUv, globeTextureWindow, landingUniforms, setGlobalLandingMask, setLandingMask,
-  onUnitSphere, southCapUvs, southColorUv, southColorUniforms,
+  buildNorthCap, northCapPoint, northCapUv, onUnitSphere, reprojectNorthCap, southCapUvs, southColorUv, southColorUniforms,
 } from './moonGlobe.js'
 
 const FAR = { x0: -384960, y0: 384960, columns: 802, rows: 802, resolutionM: 960 }
@@ -190,5 +190,91 @@ describe('o mapa das áreas de pouso na Lua que anda e gira (vista da missão)',
   it('desligado, as duas forças ficam em zero: a Lua aparece como é', () => {
     expect(landingUniforms.uLandingStrength.value).toBe(0)
     expect(landingUniforms.uGlobalLandingStrength.value).toBe(0)
+  })
+})
+
+/* O polo norte da Lua da vista da missão (visto pelo Marco em 20/11/2026): na esfera, a cor e o
+   relevo vêm de imagens em latitude e longitude, e no polo elas saem em raios. O polo sul tem malha
+   e imagem próprias (MoonSouthCap.jsx); o norte não tem dado polar próprio, e a imagem dele é
+   refeita no navegador a partir das duas imagens que o site já baixa, na projeção do próprio polo. */
+describe('o polo norte com malha e imagem próprias', () => {
+  const ALCANCE = 12
+
+  it('o ponto da imagem polar: o polo no meio, a borda do alcance na borda do círculo', () => {
+    expect(northCapUv([0, 1, 0], ALCANCE)).toEqual([0.5, 0.5])
+    for (const lon of [0, 73, -140]) {
+      const [u, v] = northCapUv(latLonToScene(90 - ALCANCE, lon), ALCANCE)
+      expect(Math.hypot(u - 0.5, v - 0.5)).toBeCloseTo(0.5, 9)
+    }
+  })
+
+  it('o ponto da imagem e o da Lua são o caminho de ida e o de volta', () => {
+    for (const [lat, lon] of [[89, 10], [84, -100], [79, 170]]) {
+      const ponto = latLonToScene(lat, lon)
+      const volta = northCapPoint(...northCapUv(ponto, ALCANCE), ALCANCE)
+      for (let k = 0; k < 3; k++) expect(volta[k]).toBeCloseTo(ponto[k], 9)
+    }
+  })
+
+  it('a malha: vértices no raio 1, todos dentro do alcance, cada um com o ponto da imagem dele', () => {
+    const { positions, uvs, indices } = buildNorthCap(ALCANCE, 24, 64)
+    const vertices = positions.length / 3
+    expect(uvs.length).toBe(vertices * 2)
+    for (let i = 0; i < vertices; i++) {
+      const p = [positions[3 * i], positions[3 * i + 1], positions[3 * i + 2]]
+      expect(Math.hypot(...p)).toBeCloseTo(1, 6)
+      expect(Math.asin(p[1]) * (180 / Math.PI)).toBeGreaterThan(90 - ALCANCE - 1e-6)
+      const [u, v] = northCapUv(p, ALCANCE)
+      expect(uvs[2 * i]).toBeCloseTo(u, 6)
+      expect(uvs[2 * i + 1]).toBeCloseTo(v, 6)
+    }
+    expect(Math.max(...indices)).toBe(vertices - 1)
+    expect(indices.length % 3).toBe(0)
+  })
+
+  /* Duas imagens de mentira, em latitude e longitude, como color.jpg e normal.jpg: na de cor o
+     vermelho diz a longitude e o verde a latitude; a de normais é toda "reta para cima" ou toda
+     "inclinada para o leste". */
+  const LARGURA = 360
+  const ALTURA = 180
+  const imagem = (pixel) => {
+    const data = new Uint8ClampedArray(LARGURA * ALTURA * 4)
+    for (let row = 0; row < ALTURA; row++) {
+      for (let col = 0; col < LARGURA; col++) data.set([...pixel(col, row), 255], (row * LARGURA + col) * 4)
+    }
+    return { data, width: LARGURA, height: ALTURA }
+  }
+  // a linha 0 é a de cima, o norte: latitude 90 − (linha + 0,5); a coluna 0 é a longitude −180
+  const cor = imagem((col, row) => [Math.round((col / LARGURA) * 255), Math.round((row / ALTURA) * 255), 0])
+  const reta = imagem(() => [128, 128, 255])
+  const leste = imagem(() => [255, 128, 128])
+  const TAMANHO = 64
+  const pixelDe = (u, v) => (Math.min(TAMANHO - 1, Math.floor(v * TAMANHO)) * TAMANHO + Math.min(TAMANHO - 1, Math.floor(u * TAMANHO))) * 4
+
+  it('a cor de cada ponto da imagem polar é a da mesma latitude e longitude na imagem da esfera', () => {
+    const { color } = reprojectNorthCap({ color: cor, normal: reta }, TAMANHO, ALCANCE)
+    for (const [lat, lon] of [[85, 30], [82, -120], [80, 150]]) {
+      const [u, v] = northCapUv(latLonToScene(lat, lon), ALCANCE)
+      const i = pixelDe(u, v)
+      expect(Math.abs(color[i] - ((lon + 180) / 360) * 255)).toBeLessThan(4)
+      expect(Math.abs(color[i + 1] - ((90 - lat) / 180) * 255)).toBeLessThan(4)
+    }
+  })
+
+  /* O relevo vira normais da própria Lua (object space): na esfera elas são contadas do chão de cada
+     ponto, a leste e ao norte dele, e na imagem polar esses lados giram de ponto para ponto. */
+  it('a normal "reta para cima" vira a direção do próprio ponto; a "para o leste", o leste dele', () => {
+    const cima = reprojectNorthCap({ color: cor, normal: reta }, TAMANHO, ALCANCE).normal
+    const paraLeste = reprojectNorthCap({ color: cor, normal: leste }, TAMANHO, ALCANCE).normal
+    const vetor = (data, i) => [0, 1, 2].map((k) => (data[i + k] / 255) * 2 - 1)
+    for (const [lat, lon] of [[86, 40], [81, -75]]) {
+      const ponto = latLonToScene(lat, lon)
+      const i = pixelDe(...northCapUv(ponto, ALCANCE))
+      const n = vetor(cima, i)
+      expect(n[0] * ponto[0] + n[1] * ponto[1] + n[2] * ponto[2]).toBeGreaterThan(0.99)
+      const lesteDoPonto = latLonToScene(0, lon + 90)
+      const e = vetor(paraLeste, i)
+      expect(e[0] * lesteDoPonto[0] + e[1] * lesteDoPonto[1] + e[2] * lesteDoPonto[2]).toBeGreaterThan(0.98)
+    }
   })
 })

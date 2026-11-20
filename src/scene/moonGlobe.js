@@ -282,3 +282,122 @@ ${GLOBAL_LANDING_GLSL}`,
 }`,
     )
 }
+
+/* O polo norte da Lua das vistas do espaço (visto quebrado pelo Marco em 20/11/2026, na vista da
+   missão): na esfera, a cor e o relevo vêm de imagens em latitude e longitude, e no polo o ponto vira
+   uma linha inteira da imagem, que sai em raios em volta dele. O polo sul tem malha e imagem próprias
+   (MoonSouthCap.jsx). O norte não tem dado polar próprio no site: a imagem dele é refeita no navegador,
+   a partir das duas imagens da esfera (color.jpg e normal.jpg), na projeção estereográfica do próprio
+   polo, em que ele é um ponto de verdade. reachDeg: até quantos graus do polo a malha vai. */
+const RAD = Math.PI / 180
+// o raio no plano da projeção de um ponto a colat radianos do polo
+const stereographic = (colat) => 2 * Math.tan(colat / 2)
+
+/* O ponto da imagem polar [u, v], de 0 a 1, de um ponto da cena (de qualquer tamanho): o polo no
+   meio, e a borda do alcance no círculo de raio 0,5. */
+export function northCapUv([x, y, z], reachDeg) {
+  const ring = Math.hypot(x, z)
+  if (ring === 0) return [0.5, 0.5]
+  const colat = Math.atan2(ring, y)
+  const scale = stereographic(colat) / (2 * stereographic(reachDeg * RAD) * ring)
+  return [0.5 + x * scale, 0.5 + z * scale]
+}
+
+// a volta: o ponto da cena, de tamanho 1, do ponto [u, v] da imagem polar
+export function northCapPoint(u, v, reachDeg) {
+  const size = 2 * stereographic(reachDeg * RAD)
+  const px = (u - 0.5) * size
+  const pz = (v - 0.5) * size
+  const rho = Math.hypot(px, pz)
+  if (rho === 0) return [0, 1, 0]
+  const colat = 2 * Math.atan(rho / 2)
+  const s = Math.sin(colat)
+  return [(s * px) / rho, Math.cos(colat), (s * pz) / rho]
+}
+
+/* A malha do polo norte, no raio 1: o polo e rings anéis em volta dele até o alcance, cada um com
+   segments vértices. Devolve { positions, uvs, indices }: os vértices em fila (x, y, z...), o ponto
+   da imagem polar de cada um (northCapUv) e os triângulos, virados para fora. */
+export function buildNorthCap(reachDeg, rings, segments) {
+  const count = 1 + rings * segments
+  const positions = new Float32Array(count * 3)
+  const uvs = new Float32Array(count * 2)
+  positions.set([0, 1, 0], 0)
+  uvs.set([0.5, 0.5], 0)
+  for (let ring = 1; ring <= rings; ring++) {
+    const colat = (reachDeg * RAD * ring) / rings
+    for (let j = 0; j < segments; j++) {
+      const lon = (2 * Math.PI * j) / segments
+      // a mesma convenção da cena (coordinates.js): x = cos(lat)·cos(lon), y = sin(lat), z = −cos(lat)·sin(lon)
+      const point = [Math.sin(colat) * Math.cos(lon), Math.cos(colat), -Math.sin(colat) * Math.sin(lon)]
+      const index = 1 + (ring - 1) * segments + j
+      positions.set(point, 3 * index)
+      uvs.set(northCapUv(point, reachDeg), 2 * index)
+    }
+  }
+  const indices = []
+  const at = (ring, j) => 1 + (ring - 1) * segments + (j % segments)
+  for (let j = 0; j < segments; j++) indices.push(0, at(1, j), at(1, j + 1))
+  for (let ring = 1; ring < rings; ring++) {
+    for (let j = 0; j < segments; j++) {
+      indices.push(at(ring, j), at(ring + 1, j), at(ring + 1, j + 1), at(ring, j), at(ring + 1, j + 1), at(ring, j + 1))
+    }
+  }
+  return { positions, uvs, indices: Uint32Array.from(indices) }
+}
+
+/* O valor de um canal de uma imagem em latitude e longitude (RGBA, a linha 0 em cima, no norte; a
+   coluna 0 na longitude −180°), entre os quatro pixels em volta: a longitude dá a volta, a latitude
+   para nas bordas. */
+function sampleEquirect({ data, width, height, rows = height }, latDeg, lonDeg, out) {
+  const fx = ((lonDeg + 180) / 360) * width - 0.5
+  const fy = ((90 - latDeg) / 180) * height - 0.5
+  const x0 = Math.floor(fx)
+  const y0 = Math.floor(fy)
+  const tx = fx - x0
+  const ty = fy - y0
+  const col = (x) => ((x % width) + width) % width
+  // rows: quantas linhas de cima a imagem trouxe (o navegador lê só a faixa do polo, e não a imagem inteira)
+  const row = (y) => Math.min(rows - 1, Math.max(0, y))
+  const a = (row(y0) * width + col(x0)) * 4
+  const b = (row(y0) * width + col(x0 + 1)) * 4
+  const c = (row(y0 + 1) * width + col(x0)) * 4
+  const d = (row(y0 + 1) * width + col(x0 + 1)) * 4
+  for (let k = 0; k < 3; k++) {
+    out[k] = (data[a + k] * (1 - tx) + data[b + k] * tx) * (1 - ty) + (data[c + k] * (1 - tx) + data[d + k] * tx) * ty
+  }
+  return out
+}
+
+/* As duas imagens do polo norte, size × size pixels RGBA, na projeção de northCapUv: a cor, tirada
+   da imagem de cor da esfera; e as normais do relevo, tiradas do mapa de normais da esfera e passadas
+   para normais da própria Lua (object space). Na esfera cada normal é contada do chão do ponto, para
+   o leste e para o norte dele; na imagem polar esses lados giram de pixel para pixel, e só a normal
+   da Lua continua valendo. color e normal: { data, width, height, rows }, as imagens da esfera; rows,
+   quando vem, diz quantas linhas de cima estão em data (a faixa do polo). */
+export function reprojectNorthCap({ color, normal }, size, reachDeg) {
+  const colorOut = new Uint8Array(size * size * 4)
+  const normalOut = new Uint8Array(size * size * 4)
+  const sample = [0, 0, 0]
+  for (let j = 0; j < size; j++) {
+    for (let i = 0; i < size; i++) {
+      const up = northCapPoint((i + 0.5) / size, (j + 0.5) / size, reachDeg)
+      const latDeg = Math.asin(up[1]) / RAD
+      const lonDeg = Math.atan2(-up[2], up[0]) / RAD
+      const o = (j * size + i) * 4
+      sampleEquirect(color, latDeg, lonDeg, sample)
+      colorOut.set([sample[0], sample[1], sample[2], 255], o)
+
+      // o leste e o norte do ponto, na cena: o leste é horizontal, e norte = cima × leste
+      const lon = lonDeg * RAD
+      const east = [-Math.sin(lon), 0, -Math.cos(lon)]
+      const north = [up[1] * east[2] - up[2] * east[1], up[2] * east[0] - up[0] * east[2], up[0] * east[1] - up[1] * east[0]]
+      sampleEquirect(normal, latDeg, lonDeg, sample)
+      const [nx, ny, nz] = sample.map((value) => (value / 255) * 2 - 1)
+      const n = [0, 1, 2].map((k) => east[k] * nx + north[k] * ny + up[k] * nz)
+      const length = Math.hypot(...n)
+      normalOut.set([...n.map((value) => Math.round(((value / length + 1) / 2) * 255)), 255], o)
+    }
+  }
+  return { color: colorOut, normal: normalOut }
+}
