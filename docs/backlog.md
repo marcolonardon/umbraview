@@ -2966,6 +2966,48 @@ font is still Fira Sans.
   from the times of the mission, which moves all the time. Found on the way: the events lost their
   time when they became the path of the drawing, and `nextEvent` always gave the landing, so the
   name in the scene was always "Landing" since card C16. Fixed: the events keep their time.
+- **"The white line no longer follows the track, and the telemetry still does not work"** (Marco,
+  19/11). The cause was not in the panel: it was the rule for those who asked the system for less
+  motion (`src/styles/global.css`). It set every transition to 1 ms, and what changes at every frame
+  (the dot of the spacecraft and the flown line on the arc, the lit arc of the gauges) started a new
+  transition at every frame, from the value before, and stayed at the start. Found by running the
+  flight in a Chrome with no window, which reads the "less motion" setting of Marco's Windows: the
+  dot stuck at the launch with the clock at T+ 14 h, and even a plain element of the page did not
+  take a new width. Now that rule removes the transitions (`transition: none`), with a test of its
+  own (`src/styles/global.test.js`). After it, the same run: the dot past "Crossing" at T+ 15 h 54
+  min, the flown line up to it, and the gauges lit at 91% (1.82 of 2 km/s) and 72% (143,186 of
+  200,000 km). `npm run verify` passes, with 1023 tests.
+- **The telemetry only when it is real, a third reading, and a look of its own** (Marco, 19/11:
+  "only show the telemetry data when they exist", the distance to the Moon as a third gauge, and the
+  gauges "too similar to the reference"). In the climb and in the final descent, which are drawn,
+  the telemetry leaves the screen instead of showing "—". The two round dials became one instrument:
+  three rings one inside the other (the distance to the Moon outside, in the grey of the Moon; the
+  altitude; the velocity inside, in the accent color), with a legend beside it, one line per ring
+  with a bar of its color, the number and the scale. The distance to the Moon (`moonDistanceKm`, in
+  `src/scene/missionHud.js`) is from the spacecraft to the ground of the Moon, from the positions of
+  the spacecraft and of the Moon at the instant; in the parking orbit, where the altitude and the
+  velocity do not change, it does (396,545 to 404,050 km in half a lap, measured in the run below).
+  Seen in a Chrome with no window at 1440 × 900 and 375 × 812: no telemetry in the climb, then the
+  three rings from T+ 10 min. `npm run verify` passes, with 1027 tests.
+- **The instrument always in view, and the time warp said clearly** (Marco, 19/11). Marco then
+  preferred the instrument always on screen: in the drawn stretches the rings go dark and the legend
+  says "—". Under the clock, "Time warp ×23,578 · 1 s = 7 h": how many times faster than real time
+  the mission moves in the phase of now (`timeWarp`, in `src/scene/missionHud.js`: the seconds of the
+  phase over its seconds on screen), from ×120 in the climb to about ×23,600 in the crossing. The
+  single "4× speed" button, which did not say 4 times what, became a selector of three speeds,
+  1×, 2× and 4×, over the normal pace (the whole mission in 45 s). Seen in a Chrome with no window
+  at 1440 × 900: ×120 in the climb, ×739 in the parking orbit, ×23,578 in the crossing, and the
+  numbers of the legend on one line each. `npm run verify` passes, with 1031 tests.
+- **The landing summary and the map** (Marco, 19/11: the "Mission complete" card covered the map of
+  the path; the map should expand or hide, with icon buttons only). The summary is now one row under
+  the clock, inside the band, in place of the sentence of the phase: over the scene it covered the
+  map, and in the narrow right column of the band it was too tall for a 720 px screen (both seen, the
+  second in a Chrome with no window). The map has two icon buttons, drawn in the code, with their
+  name for the screen reader and the mouse hint: expand and shrink (the map goes to 400 px wide),
+  and minimize and restore (a small bar, not an X: the map is minimized, not closed, as Marco asked on
+  20/11). Seen at 1280 × 720: the summary clear of the map, and the expanded map. Known:
+  expanded, at that size, the map covers the phase name on the right of the band; it is the person's
+  choice, and one click shrinks it. `npm run verify` passes, with 1033 tests.
 - **On the right, the phase in capitals** and one sentence on what it is (`phaseNotes`, in
   `src/data/missionView.js`), and the buttons to play, of the speed and of the free camera.
 - The flight card is still there for the screen reader, with the same name and text; on screen only
