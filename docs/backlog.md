@@ -3008,6 +3008,18 @@ font is still Fira Sans.
   20/11). Seen at 1280 × 720: the summary clear of the map, and the expanded map. Known:
   expanded, at that size, the map covers the phase name on the right of the band; it is the person's
   choice, and one click shrinks it. `npm run verify` passes, with 1033 tests.
+- **"One of the poles of the Moon is broken in the Mission tab"** (Marco, 20/11, with a print): the
+  north pole, in rays. It had no mesh of its own, as the south pole has since 19/11: the color and the
+  relief of the sphere are images in latitude and longitude, in which the pole is a whole line. There
+  is no polar data of the north in the site, so its images are redone in the browser from the two
+  images of the sphere, only the top band of them (20°), in the stereographic projection of the pole
+  (`reprojectNorthCap`, in `src/scene/moonGlobe.js`), and a mesh of its own uses them
+  (`MoonNorthCap.jsx`, out to 12° from the pole). The relief becomes normals of the Moon itself
+  (object space): in the polar projection the east and the north of each point turn from pixel to
+  pixel. Done once per page, about 130 ms (measured in Node on Marco's computer). Seen in a Chrome
+  with no window, the same view with and without the mesh: rays without it, craters with it.
+  `npm run verify` passes, with 1038 tests. Not verified: the seam at 12° from close up in a real
+  browser.
 - **On the right, the phase in capitals** and one sentence on what it is (`phaseNotes`, in
   `src/data/missionView.js`), and the buttons to play, of the speed and of the free camera.
 - The flight card is still there for the screen reader, with the same name and text; on screen only
